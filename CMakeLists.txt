@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(OrbitQueue VERSION 2.0.0 LANGUAGES CXX)
 
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+
 option(ORBITQUEUE_BUILD_TESTS "Build OrbitQueue tests" ON)
 option(ORBITQUEUE_BUILD_BENCHMARKS "Build OrbitQueue benchmarks" ON)
 option(ORBITQUEUE_ENABLE_WARNINGS "Enable strong compiler warnings" ON)
@@ -14,7 +17,7 @@ add_library(OrbitQueue::orbitqueue ALIAS orbitqueue)
 target_compile_features(orbitqueue INTERFACE cxx_std_20)
 target_include_directories(orbitqueue INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>)
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(ORBITQUEUE_ENABLE_WARNINGS)
     if(MSVC)
@@ -46,3 +49,27 @@ endif()
 if(ORBITQUEUE_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
 endif()
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/OrbitQueueConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/OrbitQueueConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/OrbitQueueConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/OrbitQueue")
+
+install(TARGETS orbitqueue EXPORT OrbitQueueTargets)
+install(DIRECTORY include/orbitqueue
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES LICENSE
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+install(EXPORT OrbitQueueTargets
+    FILE OrbitQueueTargets.cmake
+    NAMESPACE OrbitQueue::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/OrbitQueue")
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/OrbitQueueConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/OrbitQueueConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/OrbitQueue")

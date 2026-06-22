@@ -45,6 +45,25 @@ For ThreadSanitizer, use a separate build with
 `-DORBITQUEUE_ENABLE_SANITIZERS=ON -DORBITQUEUE_SANITIZERS=thread` because TSan
 cannot generally be combined with ASan.
 
+## Install and consume
+
+Install OrbitQueue to a prefix:
+
+```sh
+cmake --install build --prefix /path/to/orbitqueue
+```
+
+Downstream CMake projects can then use the exported target:
+
+```cmake
+find_package(OrbitQueue 2 CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE OrbitQueue::orbitqueue)
+```
+
+Pass the installation prefix through `CMAKE_PREFIX_PATH` when it is outside a
+standard system location. The test suite includes an isolated downstream build
+that validates this workflow.
+
 ## Benchmark
 
 ```sh
@@ -67,7 +86,6 @@ made.
 ## Roadmap
 
 - Expand randomized and long-duration sanitizer testing.
-- Add package installation and downstream-consumer tests.
 - Record benchmark environment metadata and repeated-trial statistics.
 - Investigate faster multicast synchronization only behind equivalent
   correctness tests.
