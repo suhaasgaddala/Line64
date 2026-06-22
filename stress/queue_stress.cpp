@@ -277,6 +277,12 @@ void print_usage(std::ostream& output) {
     if (config.capacity == 0) {
         throw std::invalid_argument("capacity must be greater than zero");
     }
+    if ((config.queue == "all" || config.queue == "mpmc") &&
+        (config.capacity < 2 ||
+         (config.capacity & (config.capacity - 1)) != 0)) {
+        throw std::invalid_argument(
+            "MPMC stress capacity must be a power of two greater than one");
+    }
     if (config.queue == "spsc" &&
         (config.producers != 1 || config.consumers != 1)) {
         throw std::invalid_argument("SPSC stress requires one producer and one consumer");
@@ -727,6 +733,7 @@ struct MulticastMetrics {
                 std::vector<std::byte> payload(config.payload_size);
                 const auto result = queue.try_pop(payload);
                 if (result.status == QueueStatus::success) {
+                    popped.fetch_add(1, std::memory_order_relaxed);
                     const auto header = read_header(payload);
                     const auto global = header.global_sequence;
                     const bool in_range = header.producer_id < config.producers &&
@@ -758,12 +765,14 @@ struct MulticastMetrics {
                         }
                         seen = 1;
                     }
-                    popped.fetch_add(1, std::memory_order_relaxed);
                 } else if (result.status == QueueStatus::empty) {
                     empty_retries.fetch_add(1, std::memory_order_relaxed);
+                    if (remaining_producers.load(std::memory_order_acquire) == 0 &&
+                        popped.load(std::memory_order_relaxed) >=
+                            pushed.load(std::memory_order_relaxed)) {
+                        break;
+                    }
                     std::this_thread::yield();
-                } else if (result.status == QueueStatus::closed) {
-                    break;
                 } else {
                     failures.record({"mpmc", config.seed,
                                      popped.load(std::memory_order_relaxed),
@@ -806,9 +815,7 @@ struct MulticastMetrics {
                     std::this_thread::yield();
                 }
             }
-            if (remaining_producers.fetch_sub(1, std::memory_order_acq_rel) == 1U) {
-                queue.close();
-            }
+            remaining_producers.fetch_sub(1, std::memory_order_acq_rel);
         });
     }
 
@@ -837,7 +844,7 @@ struct MulticastMetrics {
     if (pushed_count != popped_count || missing != 0) {
         failures.record({"mpmc", config.seed, popped_count,
                          pushed_count, popped_count, 0, 0,
-                         "pushed and popped totals differ after close/drain"});
+                         "pushed and popped totals differ after drain"});
     }
     std::cout << "stress_result queue=mpmc seed=" << config.seed
               << " pushed=" << pushed_count

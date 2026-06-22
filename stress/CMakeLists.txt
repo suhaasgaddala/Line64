@@ -19,5 +19,5 @@ if(ORBITQUEUE_BUILD_TESTS)
     add_test(NAME orbitqueue_stress_mpmc_smoke
         COMMAND orbitqueue_stress
             --queue mpmc --seed 404 --duration-ms 500 --iterations 2000
-            --producers 3 --consumers 3 --payload-size 80 --capacity 37)
+            --producers 3 --consumers 3 --payload-size 80 --capacity 64)
 endif()

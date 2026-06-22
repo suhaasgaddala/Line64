@@ -8,10 +8,10 @@ sanitizer, benchmark, or memory-ordering explanation proves the whole library.
 ### Contract tests
 
 Unit-style contract tests cover deterministic state transitions and boundary
-behavior: zero capacity, payload limits, FIFO order, full/empty results,
-undersized-output retry, close/drain, independent multicast cursors, and lag
-recovery. They provide fast, precise failures but cover a limited set of thread
-schedules.
+behavior: invalid capacity, payload limits, FIFO order, full/empty results,
+queue-specific undersized-output behavior, close/drain where supported,
+independent multicast cursors, and lag recovery. They provide fast, precise
+failures but cover a limited set of thread schedules.
 
 ### Header and package tests
 

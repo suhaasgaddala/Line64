@@ -68,7 +68,8 @@ byte. Synchronization belongs to its owner:
 
 - SPSC transfers slot ownership through head/tail release-acquire edges.
 - SPMC holds one mutex across assignment and copy.
-- MPMC holds one mutex across ring mutation and copy.
+- MPMC transfers exclusive cell ownership through per-cell generation
+  sequences and CAS position claims.
 
 `FixedMessage` alone is not thread-safe. Its bounded span checks prevent buffer
 overflow but do not create synchronization.
@@ -101,17 +102,19 @@ outlive the queue.
 
 ## Bounded MPMCQueue
 
-The initial bounded `MPMCQueue` uses one mutex around its fixed-message ring and
-closure state. Multiple producers receive monotonically assigned publication
-sequences while holding that mutex. Multiple consumers claim the front slot
-while holding the same mutex, so each successful message is consumed at most
-once.
+The bounded `MPMCQueue` follows a sequence-numbered cell protocol. Enqueue and
+dequeue position atomics are loaded and claimed with relaxed ordering; these
+counters allocate unique positions but do not publish payload bytes. A producer
+acquires a cell generation, claims its position, writes the `FixedMessage`, and
+publishes `position + 1` with release ordering. A consumer's acquire load of
+that value observes the completed payload. After its dequeue CAS and copy, the
+consumer stores `position + capacity` with release ordering so a future
+producer's acquire load can safely reuse the cell.
 
-An undersized destination leaves the front slot and tail position unchanged.
-Close is monotonic: it rejects new pushes, preserves queued messages for drain,
-and changes an empty pop result from `empty` to `closed`.
-
-This is a correct conservative baseline, not a lock-free algorithm.
+The queue contains no mutex and allocates no memory during try operations. It
+also has no close operation. An undersized destination consumes the claimed
+message and releases the cell because the dequeue position cannot safely be
+rolled back. Full details are in [mpmc_queue.md](mpmc_queue.md).
 
 ## Why no mutex is not the same as lock-free
 
@@ -121,7 +124,9 @@ threads are delayed. Establishing it requires an algorithm-level argument that
 covers retry loops, allocation, atomic lock-freedom on supported platforms,
 memory reclamation, counter wrap, and every operation's linearization point.
 
-OrbitQueue does not currently make that argument for MPMC or multicast.
+OrbitQueue does not currently make that progress argument for MPMC or
+multicast. The MPMC implementation is therefore described as mutex-free, not
+as officially lock-free.
 
 ## Why the v1 SPMC algorithm was not reused
 

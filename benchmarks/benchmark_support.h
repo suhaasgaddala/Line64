@@ -4,17 +4,17 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace orbitqueue::benchmark {
 
-inline constexpr std::size_t queue_capacity = 1024;
-inline constexpr std::array<std::size_t, 3> consumer_matrix{1, 3, 10};
+inline constexpr std::size_t default_capacity = 1024;
+inline constexpr std::array<std::size_t, 3> default_consumer_matrix{1, 3, 10};
 
 struct SequenceRange {
     std::uint64_t first{};
@@ -79,34 +79,85 @@ private:
     return count + current.last - current.first + 1;
 }
 
+[[nodiscard]] inline std::string json_escape(const std::string_view value) {
+    std::ostringstream output;
+    for (const char raw_character : value) {
+        const auto character = static_cast<unsigned char>(raw_character);
+        switch (character) {
+        case '"': output << "\\\""; break;
+        case '\\': output << "\\\\"; break;
+        case '\b': output << "\\b"; break;
+        case '\f': output << "\\f"; break;
+        case '\n': output << "\\n"; break;
+        case '\r': output << "\\r"; break;
+        case '\t': output << "\\t"; break;
+        default:
+            if (character < 0x20U) {
+                output << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+                       << static_cast<unsigned int>(character) << std::dec;
+            } else {
+                output << static_cast<char>(character);
+            }
+        }
+    }
+    return output.str();
+}
+
 struct Result {
-    std::string_view queue;
+    std::string queue;
+    std::uint32_t trial{};
     std::size_t capacity{};
     std::size_t payload_size{};
     std::size_t producer_count{};
     std::size_t consumer_count{};
     std::uint64_t duration_ms{};
+    std::uint64_t warmup_ms{};
     std::uint64_t messages_published{};
     std::uint64_t aggregate_reads{};
     std::uint64_t unique_sequences_verified{};
     std::uint64_t dropped_or_lagged{};
+    std::uint64_t invalid_payloads{};
+    std::uint64_t full_retries{};
+    std::uint64_t empty_retries{};
     std::uint64_t validation_errors{};
+    double throughput_messages_per_second{};
+    double throughput_reads_per_second{};
+    std::string build_type;
+    std::string compiler;
+    std::string git_commit;
+    std::string timestamp;
+    std::string notes;
 };
 
 [[nodiscard]] inline std::string to_json(const Result& result) {
     std::ostringstream output;
-    output << "{\"queue\":\"" << result.queue
-           << "\",\"capacity\":" << result.capacity
+    output << std::setprecision(12)
+           << "{\"queue\":\"" << json_escape(result.queue)
+           << "\",\"trial\":" << result.trial
+           << ",\"capacity\":" << result.capacity
            << ",\"payload_size\":" << result.payload_size
            << ",\"producer_count\":" << result.producer_count
            << ",\"consumer_count\":" << result.consumer_count
            << ",\"duration_ms\":" << result.duration_ms
+           << ",\"warmup_ms\":" << result.warmup_ms
            << ",\"messages_published\":" << result.messages_published
            << ",\"aggregate_reads\":" << result.aggregate_reads
            << ",\"unique_sequences_verified\":"
            << result.unique_sequences_verified
            << ",\"dropped_or_lagged\":" << result.dropped_or_lagged
-           << ",\"validation_errors\":" << result.validation_errors << '}';
+           << ",\"invalid_payloads\":" << result.invalid_payloads
+           << ",\"full_retries\":" << result.full_retries
+           << ",\"empty_retries\":" << result.empty_retries
+           << ",\"validation_errors\":" << result.validation_errors
+           << ",\"throughput_messages_per_second\":"
+           << result.throughput_messages_per_second
+           << ",\"throughput_reads_per_second\":"
+           << result.throughput_reads_per_second
+           << ",\"build_type\":\"" << json_escape(result.build_type)
+           << "\",\"compiler\":\"" << json_escape(result.compiler)
+           << "\",\"git_commit\":\"" << json_escape(result.git_commit)
+           << "\",\"timestamp\":\"" << json_escape(result.timestamp)
+           << "\",\"notes\":\"" << json_escape(result.notes) << "\"}";
     return output.str();
 }
 

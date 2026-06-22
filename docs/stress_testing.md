@@ -20,7 +20,7 @@ cmake --build build --parallel
   --producers 3 \
   --consumers 3 \
   --payload-size 64 \
-  --capacity 127 \
+  --capacity 128 \
   --verbose
 ```
 
@@ -41,6 +41,7 @@ The supported options are:
 When `--queue all` is used, SPSC always runs with its required one producer and
 one consumer, and SPMC always uses one producer. The configured producer and
 consumer counts apply where the selected queue contract permits them.
+MPMC and `all` runs require a power-of-two capacity greater than one.
 
 ## Validation model
 
@@ -70,7 +71,7 @@ variation. This is useful evidence, not a proof of all possible interleavings.
   payload patterns, aggregate/unique reads, and contract-allowed lag recovery.
 - **MPMC:** validates multiple producers and consumers, queue sequence order,
   full/empty retries, payload uniqueness, duplicate/loss detection, and
-  close/drain completion.
+  external producer-completion coordination followed by drain completion.
 
 Short scenario-specific smoke runs are registered with CTest. Long runs are
 intentional local or scheduled validation and are not part of normal CI.

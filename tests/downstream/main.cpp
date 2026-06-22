@@ -16,7 +16,7 @@ int main() {
     const auto written = queue.try_push(std::span<const std::byte>{payload});
     const auto read = queue.try_pop(std::span<std::byte>{destination});
 
-    orbitqueue::MPMCQueue<4> mpmc(1);
+    orbitqueue::MPMCQueue<4> mpmc(2);
     const auto mpmc_written = mpmc.try_push(std::span<const std::byte>{payload});
     const auto mpmc_read = mpmc.try_pop(std::span<std::byte>{destination});
 

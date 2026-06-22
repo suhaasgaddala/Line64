@@ -15,20 +15,21 @@ is empty.
 `MPMCQueue<MaxPayloadSize>` is a bounded multi-producer, multi-consumer
 work-sharing queue. Every successful push receives an increasing publication
 sequence, and each queued message can be popped successfully by at most one
-consumer. Capacity must be nonzero. The initial implementation uses a mutex
-around a preallocated `FixedMessage` ring and makes no lock-free or wait-free
-claim.
+consumer. Capacity must be a power of two greater than one. The implementation
+uses a preallocated array of sequence-numbered cells and contains no mutex.
 
 `try_push` returns `full` without overwriting unread data, rejects payloads
-larger than the template maximum, and returns `closed` after shutdown.
-`try_pop` returns `empty` while an open queue has no data. An undersized output
-returns `message_too_large` without consuming the front message, allowing a
-retry with a larger span.
+larger than the template maximum, and never waits. `try_pop` returns `empty`
+when no cell is published. A consumer claims its dequeue position before
+copying, so an undersized output returns `message_too_large` with zero bytes and
+the message sequence **and consumes the message**.
 
-`close` is idempotent, rejects later pushes, and preserves queued messages for
-draining. Once the queue is both closed and empty, `try_pop` returns `closed`.
-There are no blocking MPMC operations in the current API. Sequence exhaustion
-is not handled; applications must not approach `uint64_t` wraparound.
+There are no close or blocking operations in the current API. Callers
+coordinate producer completion externally and drain with `try_pop`. Position
+and generation exhaustion is not handled. The queue is described as
+mutex-free, not production-ready, formally verified, lock-free, or wait-free.
+See [mpmc_queue.md](mpmc_queue.md) for the cell protocol and memory-ordering
+rationale.
 
 ## SPSCQueue
 
