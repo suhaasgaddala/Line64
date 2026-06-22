@@ -14,6 +14,14 @@ endif()
 add_executable(orbitqueue_tests ${orbitqueue_test_sources})
 target_link_libraries(orbitqueue_tests PRIVATE orbitqueue Threads::Threads)
 
+add_library(orbitqueue_header_self_sufficiency OBJECT
+    header_self_sufficiency/blocking_queue.cpp
+    header_self_sufficiency/fixed_message.cpp
+    header_self_sufficiency/result.cpp
+    header_self_sufficiency/spmc_multicast_queue.cpp
+    header_self_sufficiency/spsc_queue.cpp)
+target_link_libraries(orbitqueue_header_self_sufficiency PRIVATE orbitqueue)
+
 if(ORBITQUEUE_BUILD_BENCHMARKS)
     target_include_directories(orbitqueue_tests PRIVATE "${PROJECT_SOURCE_DIR}/benchmarks")
     target_compile_definitions(orbitqueue_tests PRIVATE
