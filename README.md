@@ -1,4 +1,4 @@
-# Bounded Concurrent Queues for C++20
+# Bounded Concurrent Queues for C++20 (spsc, spmc, mpmc, & blocking)
 
 A header-only C++20 library of bounded concurrent queue implementations with
 explicit delivery semantics, deterministic stress validation, sanitizer-backed
