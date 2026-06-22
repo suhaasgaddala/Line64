@@ -1,0 +1,27 @@
+# Architecture
+
+OrbitQueue v2 is a header-only C++20 library. Public headers live under
+`include/orbitqueue`, contract tests under `tests`, and measurement code under
+`benchmarks`. The `orbitqueue` CMake interface target carries include paths,
+language requirements, warnings, and optional sanitizer flags to consumers.
+
+Queue contracts come before optimization because concurrency results are only
+meaningful when delivery, capacity, ordering, overwrite, and ownership rules
+are defined. The result types make ordinary boundary states inspectable rather
+than encoding them as undefined behavior or ambiguous booleans.
+
+The old prototype was rebuilt instead of patched because its global types,
+raw callback writes, caller-managed indices, synchronization protocol, build
+assumptions, and benchmark semantics did not provide a stable foundation.
+The v2 code does not reuse its queue algorithms.
+
+`SPSCQueue` uses monotonic head and tail counters. A producer publishes a fully
+written slot with a release store; the consumer observes it with an acquire
+load and releases capacity after copying. This relies on exactly one producer
+and one consumer.
+
+`SPMCMulticastQueue` uses a mutex around slot publication and consumer copies.
+This conservative design prevents a producer from rewriting a payload while a
+consumer reads it. Per-consumer sequence cursors identify retained messages
+and report lag when ring history has been overwritten. It is not described as
+lock-free.
