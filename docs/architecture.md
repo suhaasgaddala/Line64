@@ -8,12 +8,15 @@ language requirements, warnings, and optional sanitizer flags to consumers.
 ```mermaid
 flowchart LR
     API["OrbitQueue::orbitqueue"] --> BQ["BlockingQueue<T>"]
+    API --> MPMC["MPMCQueue<N>"]
     API --> SPSC["SPSCQueue<N>"]
     API --> SPMC["SPMCMulticastQueue<N>"]
     SPSC --> FM["FixedMessage<N>"]
     SPMC --> FM
+    MPMC --> FM
     TESTS["Contract and package tests"] --> API
     BENCH["JSON benchmark matrix"] --> BQ
+    BENCH --> MPMC
     BENCH --> SPSC
     BENCH --> SPMC
     BOOST["Optional Boost.Lockfree baseline"] -. "OFF by default" .-> BENCH
@@ -40,11 +43,18 @@ consumer reads it. Per-consumer sequence cursors identify retained messages
 and report lag when ring history has been overwritten. It is not described as
 lock-free.
 
+`MPMCQueue` is the bounded fixed-payload work-sharing counterpart to the
+generic blocking baseline. It uses a preallocated power-of-two cell array,
+atomic enqueue/dequeue position claims, and per-cell acquire/release generation
+sequences. Payload bytes are copied only while a thread owns the cell. The
+implementation contains no mutex; its try-only operations return `full` or
+`empty` instead of waiting. It has no close operation.
+
 The benchmark layer is not part of the installed API. Its scenario-specific
 drivers preserve queue ownership contracts: SPSC always has one consumer,
 while multicast, blocking MPMC, and optional Boost work-sharing queues use one,
-three, and ten consumers. Shared benchmark helpers format results and track
-monotonic sequence ranges without retaining every observed message.
+three, and ten consumers. Shared benchmark helpers format results and retain
+validated IDs during each trial to detect duplicate or missing work.
 
 Boost is discovered only when `ORBITQUEUE_ENABLE_BOOST_BENCHMARKS=ON`. Missing
 Boost headers disable those scenarios with a configure-time warning; they do

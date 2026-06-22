@@ -69,4 +69,39 @@ void run_spmc_multicast_queue_tests() {
     const std::array<std::byte, 9> oversized{};
     expect(wrapping.try_publish(oversized).status == QueueStatus::message_too_large,
            "multicast queue must reject oversized messages");
+
+    SPMCMulticastQueue<8> retry_queue(1);
+    auto retry_consumer = retry_queue.register_consumer();
+    expect(retry_queue.try_publish(bytes_of(first)).status == QueueStatus::success,
+           "multicast retry setup publish must succeed");
+    std::array<std::byte, 4> short_destination{};
+    expect(retry_consumer.try_read(short_destination).status ==
+               QueueStatus::message_too_large,
+           "undersized multicast output must be rejected");
+    output = 0;
+    const auto retried = retry_consumer.try_read(writable_bytes_of(output));
+    expect(retried.status == QueueStatus::success && retried.sequence == 1 &&
+               output == first,
+           "undersized multicast output must not advance the consumer");
+
+    SPMCMulticastQueue<8> late_registration(2);
+    expect(late_registration.try_publish(bytes_of(first)).status == QueueStatus::success,
+           "pre-registration publication must succeed");
+    auto late_consumer = late_registration.register_consumer();
+    expect(late_consumer.try_read(writable_bytes_of(output)).status == QueueStatus::empty,
+           "new multicast consumer must not replay prior history");
+    expect(late_registration.try_publish(bytes_of(second)).status == QueueStatus::success,
+           "post-registration publication must succeed");
+    expect(late_consumer.try_read(writable_bytes_of(output)).sequence == 2 &&
+               output == second,
+           "new multicast consumer must start at the next publication");
+
+    SPMCMulticastQueue<0> zero_payload_queue(1);
+    auto zero_payload_consumer = zero_payload_queue.register_consumer();
+    expect(zero_payload_queue.try_publish(std::span<const std::byte>{}).status ==
+               QueueStatus::success,
+           "zero-byte multicast payload must be accepted");
+    expect(zero_payload_consumer.try_read(std::span<std::byte>{}).status ==
+               QueueStatus::success,
+           "zero-byte multicast payload must round trip");
 }

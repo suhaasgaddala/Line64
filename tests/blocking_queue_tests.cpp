@@ -62,4 +62,19 @@ void run_blocking_queue_tests() {
            "drained closed queue must report closed");
     expect(blocked_producer_queue.try_push(3) == QueueStatus::closed,
            "closed queue must reject new items");
+
+    blocked_producer_queue.close();
+    blocked_producer_queue.close();
+    expect(blocked_producer_queue.closed(),
+           "repeated close calls must be idempotent");
+
+    BlockingQueue<int> direct_drain(3);
+    expect(direct_drain.try_push(4) == QueueStatus::success &&
+               direct_drain.try_push(5) == QueueStatus::success,
+           "direct drain setup pushes must succeed");
+    direct_drain.close();
+    expect(direct_drain.pop() == 4 && direct_drain.pop() == 5,
+           "blocking pop must drain queued items after close");
+    expect(!direct_drain.pop().has_value(),
+           "blocking pop must return nullopt after a closed queue drains");
 }

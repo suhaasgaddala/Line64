@@ -45,6 +45,27 @@ void run_spsc_queue_tests() {
     expect(queue.try_push(oversized).status == QueueStatus::message_too_large,
            "SPSC queue must reject oversized messages");
 
+    SPSCQueue<8> retry_queue(1);
+    expect(retry_queue.try_push(bytes_of(first)).status == QueueStatus::success,
+           "SPSC retry setup push must succeed");
+    std::array<std::byte, 4> short_destination{};
+    expect(retry_queue.try_pop(short_destination).status ==
+               QueueStatus::message_too_large,
+           "undersized SPSC output must be rejected");
+    output = 0;
+    const auto retried = retry_queue.try_pop(writable_bytes_of(output));
+    expect(retried.status == QueueStatus::success && retried.sequence == 1 &&
+               output == first,
+           "undersized SPSC output must not consume the message");
+
+    SPSCQueue<0> zero_payload_queue(1);
+    expect(zero_payload_queue.try_push(std::span<const std::byte>{}).status ==
+               QueueStatus::success,
+           "zero-byte SPSC payload must be accepted");
+    expect(zero_payload_queue.try_pop(std::span<std::byte>{}).status ==
+               QueueStatus::success,
+           "zero-byte SPSC payload must round trip");
+
     SPSCQueue<8> stress(7);
     constexpr std::uint64_t count = 50'000;
     std::atomic<bool> sequence_error{false};
