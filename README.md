@@ -113,6 +113,28 @@ contracts; stress explores many scheduled operations; sanitizers inspect
 executed paths; benchmark validation rejects corrupt or inconsistent measured
 work. None is a formal proof.
 
+## Design Evidence
+
+### Multicast index exploration
+
+![Global-index multicast ring exploration](docs/assets/spmc_global_indices.png)
+
+The blue ring captures the index-contention question behind the multicast
+research: consumers can advance independently while a producer publishes into
+bounded storage. It is design evidence, not the current synchronization
+protocol. `SPMCMulticastQueue` owns consumer cursors and uses a mutex across
+publication and payload copy to prevent writer/reader data races.
+
+### Benchmark semantics example
+
+![Non-comparable benchmark semantics example](docs/assets/benchmark_semantics_example.png)
+
+The red chart demonstrates why a throughput total needs a delivery contract.
+Its SPMC bars count multicast observations while the baselines count exclusive
+pops, so the bars are not equivalent work and are not a current performance
+claim. The maintained benchmark emits separate publication, aggregate-read,
+unique-sequence, retry, and validation fields.
+
 ## Quick Start
 
 Requirements: CMake 3.20 or newer and a C++20 compiler.
@@ -256,12 +278,6 @@ overhead. See [docs/benchmarking.md](docs/benchmarking.md).
 - [Correctness strategy](docs/correctness_strategy.md)
 - [Stress testing](docs/stress_testing.md)
 - [Benchmarking](docs/benchmarking.md)
-
-## Historical Prototype
-
-This project supersedes the original OrbitQueue/AtomicRing-style prototype.
-The current library uses bounded span-based APIs, explicit delivery contracts,
-tests, deterministic stress validation, sanitizer paths, and reproducible
-benchmark output. Legacy diagrams, audits, and benchmark images remain under
-[`docs/legacy`](docs/legacy/README.md) as historical artifacts only; they are
-not current designs or performance evidence.
+- [Research motivation](docs/research_motivation.md)
+- [Queue design decisions](docs/design_decisions.md)
+- [Queue design explorations](docs/design_explorations.md)

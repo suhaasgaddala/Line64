@@ -1,7 +1,7 @@
 # Bounded Concurrent Queues for C++20: Project Context
 
-> Detailed repository snapshot for the `project-identity-and-diagrams` milestone,
-> updated 2026-06-22. Public headers and tests remain the source of truth.
+> Detailed repository snapshot updated 2026-06-22. Public headers and tests
+> remain the source of truth.
 
 ## 1. Purpose and Evidence Model
 
@@ -18,7 +18,7 @@ This document uses four evidence categories:
 - **Limitation:** absent behavior or a property not established by evidence.
 
 When statements disagree, use this order: public headers, executable tests,
-focused contract documents, this snapshot, then historical material.
+focused contract documents, this snapshot, then supporting documentation.
 
 The library is experimental. It is not claimed production-ready, formally
 verified, wait-free, officially lock-free, or fastest. Mutex-free describes the
@@ -51,7 +51,7 @@ Current non-goals:
 
 - persistent, inter-process, distributed, or network queues;
 - dynamic payload growth beyond a compile-time maximum;
-- a stable ABI or compatibility with legacy unsafe APIs;
+- a stable ABI or compatibility with raw-slot and caller-managed-index APIs;
 - cancellation, timed waits, or a unified close protocol;
 - defined position/sequence wraparound behavior;
 - formal linearizability or progress proofs;
@@ -61,22 +61,14 @@ Current non-goals:
 
 | Attribute | Value |
 | --- | --- |
-| Current GitHub remote | Legacy slug pending manual rename after review |
-| Intended repository slug | `bounded-concurrent-queues` |
+| GitHub repository | `https://github.com/suhaasgaddala/bounded-concurrent-queues` |
 | Default branch | `main` |
-| Active milestone branch | `project-identity-and-diagrams` |
-| Main baseline | `2db29b515f1158d301effbfe5060b545fb3c5011` |
-| V1 parity commit | `88b87f08a4fe749a30077c599de22c1f6d54e5a4` |
 | Project version | `2.1.0` |
 | CMake project identifier | `BoundedConcurrentQueues` |
 | Core form | Header-only CMake interface target |
 | Required language | C++20 |
 | Minimum CMake | 3.20 |
 | Mandatory third-party dependencies | None |
-
-The original OrbitQueue/AtomicRing-style repository is historical and is not
-modified by this work. Preserved artifacts live under `docs/legacy`; unsafe
-source and APIs are deliberately not reintroduced.
 
 ## 5. Repository Map
 
@@ -93,15 +85,16 @@ source and APIs are deliberately not reintroduced.
 |-- cmake/OrbitQueueConfig.cmake.in
 |-- docs/
 |   |-- architecture.md
+|   |-- assets/
 |   |-- benchmarking.md
 |   |-- correctness_strategy.md
+|   |-- design_decisions.md
+|   |-- design_explorations.md
 |   |-- memory_model.md
 |   |-- mpmc_queue.md
 |   |-- queue_contracts.md
-|   |-- stress_testing.md
-|   |-- v1_deletion_checklist.md
-|   |-- v1_parity_audit.md
-|   `-- legacy/...
+|   |-- research_motivation.md
+|   `-- stress_testing.md
 |-- include/orbitqueue/
 |   |-- blocking_queue.h
 |   |-- fixed_message.h
@@ -392,20 +385,17 @@ exercise them along with package consumption. CI does not currently include
 sanitizer jobs, Windows/macOS, model checking, long stress, performance
 thresholds, coverage, static analysis, or release packaging.
 
-## 17. Historical Prototype Relationship
+## 17. Design Boundaries
 
-The current project preserves useful concepts from the original prototype:
-bounded SPSC work sharing, multicast research, a blocking baseline, benchmark
-intent, architecture imagery, license attribution, and a detailed historical
-audit.
+The public design deliberately excludes raw allocation macros, global namespace
+types, caller-managed ring positions, callback writes into queue storage, and
+unchecked capacity or payload access. Queue storage and cursor state remain
+owned by the queue implementations.
 
-It intentionally excludes raw allocation macros, global namespace APIs,
-caller-managed ring indices, callback writes, the unsafe historical SPMC slot
-protocol, machine-specific include paths, cross-semantic throughput claims, and
-hanging benchmark shutdown behavior.
-
-Repository deletion or renaming remains a separate manual decision governed by
-`docs/v1_deletion_checklist.md`. This milestone performs neither action.
+The build and measurement design also excludes machine-specific include paths,
+directory-wide compiler settings, comparisons that conflate multicast reads
+with work-sharing pops, and shutdown paths that can strand blocking consumers.
+These are current project constraints, not compatibility promises.
 
 ## 18. Current Claims and Risks
 
@@ -444,11 +434,11 @@ Primary remaining risks:
 
 ## 19. Validation Record
 
-The foundation and v1 parity milestones previously passed Debug, Release,
-package, ASan/UBSan, TSan, minimal-option, and benchmark smoke configurations
-with Apple Clang 17. Public Ubuntu Debug/Release CI passed for the package
-baseline. Boost headers were unavailable locally, so actual optional Boost
-scenario execution remains unverified in that environment.
+Earlier validation milestones passed Debug, Release, package, ASan/UBSan, TSan,
+minimal-option, and benchmark smoke configurations with Apple Clang 17. Public
+Ubuntu Debug/Release CI passed for the package baseline. Boost headers were
+unavailable locally, so actual optional Boost scenario execution remains
+unverified in that environment.
 
 The current MPMC milestone was validated locally with Apple Clang 17:
 

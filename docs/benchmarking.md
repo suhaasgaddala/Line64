@@ -101,6 +101,20 @@ affinity, background load, allocator behavior, and compiler flags can all affect
 results. The metadata is provenance, not full environment capture, and the
 harness does not report latency distributions or statistical significance.
 
+## Semantic comparison evidence
+
+![Non-comparable benchmark semantics example](assets/benchmark_semantics_example.png)
+
+This chart is retained as a concrete example of a benchmark that cannot support
+a queue ranking. The SPMC series counts aggregate multicast observations while
+the blocking and Boost series count exclusive work-sharing pops. Raw samples,
+machine details, compiler flags, and the generation script are unavailable.
+
+The chart is therefore not a current result or regression baseline. The
+maintained harness addresses these gaps by labeling delivery units, using one
+validated payload format, emitting raw JSON trials, and failing when delivery
+accounting or payload validation is inconsistent.
+
 ## Optional Boost baseline
 
 Enable Boost scenarios with:
@@ -114,9 +128,3 @@ Boost is benchmark-only and default OFF. If `boost/lockfree/queue.hpp` is
 unavailable, CMake warns and omits only Boost scenarios. The word `lockfree`
 identifies the Boost type; its actual progress properties remain
 platform-dependent.
-
-The historical chart at
-[`docs/legacy/assets/benchmark_v1_historical.png`](legacy/assets/benchmark_v1_historical.png)
-is preserved only as a v1 artifact. The legacy benchmark compared different
-payloads and delivery semantics and retained insufficient provenance, so its
-numbers are not a current-project baseline.

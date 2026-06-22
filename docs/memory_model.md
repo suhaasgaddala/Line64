@@ -128,18 +128,18 @@ The project does not currently make that progress argument for MPMC or
 multicast. The MPMC implementation is therefore described as mutex-free, not
 as officially lock-free.
 
-## Why the v1 SPMC algorithm was not reused
+## Why multicast uses a mutex
 
-The legacy algorithm published per-slot odd/even versions but allowed a later
-producer rewrite to overlap a consumer's non-atomic payload copy. A version
-check before the copy did not protect the copy itself. Multiple consumers also
-stored derived versions and could overwrite one another's metadata updates.
-Acquire/release ordering publishes prior writes; it does not prevent a future
-writer from racing with an in-progress reader.
+A per-slot odd/even version protocol is not sufficient when a producer can
+rewrite a slot while a consumer performs a non-atomic payload copy. Checking a
+version before the copy does not protect the copy itself, and multiple
+consumers must not overwrite one another's metadata updates. Acquire/release
+ordering publishes prior writes; it does not prevent a future writer from
+racing with an in-progress reader.
 
-The current library keeps the multicast research question but uses a mutex
-until an alternative
-has an equivalent correctness argument and validation suite.
+`SPMCMulticastQueue` therefore uses a mutex across publication and payload copy.
+An alternative must provide an equivalent correctness argument and validation
+suite before replacing that synchronization boundary.
 
 ## Sanitizer evidence and limits
 

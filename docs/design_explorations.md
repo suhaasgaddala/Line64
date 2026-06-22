@@ -1,62 +1,53 @@
-# Archived OrbitQueue v1 Project Context
+# Queue Design Explorations
 
-> Historical snapshot copied into OrbitQueue v2 during the v1 parity migration.
-> It describes the legacy repository at commit `efbddb4`; paths, build status,
-> and recommendations are historical and are not instructions for v2.
-
-> Repository-wide technical and product context, based on `main` at commit
-> `efbddb4` and verified against the working tree on 2026-06-22.
+> Detailed technical record of experimental queue mechanisms evaluated during
+> development. These mechanisms are not public APIs or current performance
+> evidence. They are retained to make the resulting design decisions
+> inspectable.
 
 ## 1. Executive Summary
 
-OrbitQueue is a small C++20 research and benchmarking project for fixed-size,
-in-memory concurrent ring queues. Its main subject is a single-producer,
-multiple-consumer (SPMC) design that keeps synchronization metadata on each
-ring slot. The project also contains an experimental single-producer,
-single-consumer (SPSC) variant, a conventional bounded blocking queue, and a
-benchmark against `boost::lockfree::queue`.
+The exploration covers a single-producer, multiple-consumer (SPMC) ring with
+per-slot synchronization metadata, an SPSC variant, a conventional bounded
+blocking queue, and a benchmark against `boost::lockfree::queue`.
 
-This is an educational prototype, not a production-ready queue library. It has
-no installable library target, automated tests, continuous integration,
-versioned releases, package metadata, or supported public API. Several
-correctness and portability concerns are documented below. In particular, the
-SPMC queue's multicast behavior and concurrent access to its payload require
-more rigorous synchronization than the current implementation provides.
+The explored code is a deliberately narrow design study rather than a public
+library architecture. It has no installable target, automated tests, continuous
+integration, package metadata, or supported API. Its limitations are documented
+because they explain the contracts, validation gates, and synchronization
+boundaries in the current library.
 
-### Project at a glance
+### Exploration at a glance
 
-| Attribute | Current state |
+| Attribute | Explored state |
 | --- | --- |
 | Primary language | C++20 |
 | Build system | CMake 3.27+ |
-| Main executable | `AtomicRing` |
+| Main executable | `queue_experiment` |
 | External dependency | Boost headers, specifically Boost.Lockfree |
 | Queue models | Experimental SPMC multicast, experimental SPSC, blocking MPMC baseline |
 | Payload model | Fixed 64-byte byte buffer per ring slot |
-| License | MIT, copyright 2025 Reza Tabrizi |
-| Default branch | `main` |
-| Latest repository commit | `efbddb4` (`license`, 2025-07-16) |
 | Tests / CI | None |
 | Release artifacts | None |
 
 ## 2. Purpose and Scope
 
-The repository explores whether per-slot atomic version counters can reduce
+The design explores whether per-slot atomic version counters can reduce
 contention compared with queue designs that coordinate through global read and
 write indices. It was inspired by the CppCon 2022 talk *Trading at Light
-Speed*. The README presents two ideas:
+Speed*. Two mechanisms were evaluated:
 
 1. An SPMC ring where each consumer independently visits every slot, producing
    multicast-like delivery.
 2. An SPSC ring where an `unread` flag prevents overwrite-before-read and a
    version counter coordinates access to a slot.
 
-The current executable benchmarks only the SPMC implementation and
+The exploratory executable benchmarks only the SPMC implementation and
 `boost::lockfree::queue`. A blocking queue benchmark exists in code but is not
 called by `main()`. The SPSC implementation is compiled as a listed header in
 the CMake target but is neither included nor exercised by the executable.
 
-### Non-goals in the current code
+### Non-goals in the exploratory code
 
 - General-purpose variable-sized messages.
 - Multiple producers for either lock-free implementation.
@@ -66,18 +57,15 @@ the CMake target but is neither included nor exercised by the executable.
 - Proven lock-free progress, linearizability, or memory safety.
 - Reproducible scientific benchmarking across machines.
 
-## 3. Repository Map
+## 3. Experimental Layout
 
 ```text
-OrbitQueue/
-|-- CMakeLists.txt             CMake project and AtomicRing executable
+queue_experiment/
+|-- CMakeLists.txt             CMake project and experiment executable
 |-- README.md                  Conceptual overview and benchmark narrative
-|-- PROJECT_CONTEXT.md         This repository context document
-|-- LICENSE                    MIT license
-|-- .gitignore                 Empty in the current tree
 |-- assets/
-|   |-- benchmark.png          Historical benchmark bar chart
-|   `-- spmc_q_v1.png          Diagram of a global-index SPMC design
+|   |-- benchmark.png          Illustrative benchmark bar chart
+|   `-- spmc_global_indices.png Diagram of a global-index SPMC design
 `-- src/
     |-- main.cpp               Producers, consumers, benchmark scenarios, entry point
     |-- benchmark.h            Benchmark callable type and declaration
@@ -87,9 +75,8 @@ OrbitQueue/
     `-- BlockingQueue.h        Mutex/condition-variable bounded queue baseline
 ```
 
-There are no generated source files, submodules, vendored dependencies,
-configuration files, test directories, or deployment assets in the tracked
-tree.
+The explored layout has no generated source files, submodules, vendored
+dependencies, test directories, or deployment assets.
 
 ## 4. System Architecture
 
@@ -107,7 +94,7 @@ flowchart LR
     S["SPSC_Q"] -. "not wired into executable" .-> M
 ```
 
-The project is a single-process benchmark application. `main.cpp` constructs a
+The exploration is a single-process benchmark application. `main.cpp` constructs a
 queue, wraps queue-specific producer and consumer functions, and delegates
 thread management to `runBenchmark`. Each scenario runs for five seconds,
 stops through a shared atomic boolean, joins all threads, and prints a total
@@ -252,7 +239,7 @@ to be in an active read. Naming is inconsistent with SPMC (`read` versus
 ### 7.4 Caveats
 
 - The queue is not integrated into benchmarks or tests, so behavior is
-  unverified in this repository.
+  unverified in this design exploration.
 - The writer increments its global slot counter before knowing whether the
   slot can be written. An `ERROR` skips that ring position until wraparound.
 - The synchronization protocol is subtle and has no stress, sanitizer, or
@@ -282,7 +269,7 @@ non-blocking methods, timed methods, size inspection, or zero-capacity guard.
 
 The missing close operation affects benchmark termination: a blocking consumer
 can remain inside `pop()` after `running` becomes false if the queue is empty
-and no producer subsequently pushes. The current `main()` avoids this because
+and no producer subsequently pushes. The explored `main()` avoids this because
 it does not invoke `test_blocking()`, but enabling that test can hang during
 thread join.
 
@@ -333,15 +320,16 @@ high-throughput run. No warm-up, repetitions, confidence intervals, CPU
 affinity, compiler mode report, latency measurement, fairness measure, or
 correctness checksum is present.
 
-### 9.4 Historical chart
+### 9.4 Illustrative chart
 
-`assets/benchmark.png` reports approximate five-second totals for 1, 3, and 10
+[`assets/benchmark_semantics_example.png`](assets/benchmark_semantics_example.png)
+reports approximate five-second totals for 1, 3, and 10
 consumers. It shows SPMC far above the other queues and decreasing as consumer
 count rises. The exact raw observations, machine specifications, compiler
-flags, generation script, and date are not tracked. The README correctly notes
-that the comparison is not fair because the baseline queues are not multicast.
-The image should be treated as an illustrative historical result, not a
-reproducible performance claim.
+flags, generation script, and date are not tracked. The comparison is not fair
+because the baseline queues are not multicast. The image is an example of
+insufficient benchmark semantics and provenance, not a reproducible performance
+claim.
 
 ## 10. Build and Toolchain
 
@@ -350,14 +338,14 @@ reproducible performance claim.
 `CMakeLists.txt` declares:
 
 - Minimum CMake version 3.27.
-- Project name `AtomicRing`.
+- Project name `queue_experiment`.
 - Required C++20.
 - Required Boost discovery.
-- Executable target `AtomicRing`.
+- Executable target `queue_experiment`.
 - `src/` as an include directory.
 - Hard-coded Homebrew paths for Boost and LLVM under `/opt/homebrew/opt`.
 
-### 10.2 Current build constraints
+### 10.2 Explored build constraints
 
 The CMake file is macOS/Homebrew-specific. It sets compilers after the
 `project()` call, which is too late for reliable compiler selection, and the
@@ -365,7 +353,7 @@ hard-coded paths may not exist. It uses directory-wide include/link commands
 instead of target-scoped configuration. Boost.Lockfree is generally
 header-based, but the project still links `${Boost_LIBRARIES}`.
 
-On the audited machine:
+The environment evaluation found:
 
 - `cmake` is not installed or not on `PATH`.
 - `/opt/homebrew/opt/boost` and `/opt/homebrew/opt/llvm` do not exist.
@@ -374,19 +362,19 @@ On the audited machine:
   `boost/lockfree/queue.hpp` is unavailable.
 - Each experimental header passes an isolated Apple Clang C++20 syntax check.
 
-A contributor currently needs CMake 3.27+, a C++20 compiler, threading
-support, and Boost headers. Once those exist and CMake is made portable, the
-intended workflow is:
+The explored build requires CMake 3.27+, a C++20 compiler, threading support,
+and Boost headers. Once those exist and CMake is made portable, the intended
+workflow is:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
-./build/AtomicRing
+./build/queue_experiment
 ```
 
-Release mode matters for performance measurements. The repository does not
-currently define warning flags, optimization flags, sanitizer presets, install
-rules, or CTest targets.
+Release mode matters for performance measurements. The explored build does not
+define warning flags, optimization flags, sanitizer presets, install rules, or
+CTest targets.
 
 ## 11. Dependencies and Platform Assumptions
 
@@ -441,7 +429,8 @@ Until those exist, benchmark completion is not evidence of queue correctness.
 
 ### Build and integration risks
 
-- The committed CMake configuration is tied to absent local Homebrew paths.
+- The explored CMake configuration is tied to local Homebrew paths that may be
+  absent.
 - Boost is mandatory for the only executable, even though the core queue does
   not otherwise require it.
 - Both experimental headers define conflicting global type names.
@@ -451,7 +440,7 @@ Until those exist, benchmark completion is not evidence of queue correctness.
 
 - Compared queues have different semantics and payloads.
 - Counts are aggregate operations rather than comparable unique deliveries.
-- Historical chart inputs and environment are unavailable.
+- Illustrative chart inputs and environment are unavailable.
 - Blocking tests can hang and are currently disabled.
 - Correctness is not checked during measurement.
 
@@ -460,33 +449,9 @@ Until those exist, benchmark completion is not evidence of queue correctness.
 - No stable API, semantic versioning, changelog, contribution guide, or issue
   templates.
 - No documentation for ownership, support, releases, or compatibility.
-- Empty `.gitignore` leaves future build artifacts vulnerable to accidental
-  tracking; historical commits show generated IDE/CMake files were previously
-  committed and later removed.
+- Missing ignore rules leave build artifacts vulnerable to accidental tracking.
 
-## 14. Repository History and Ownership
-
-The history contains 12 commits from May 2024 through July 2025, all authored
-by Reza Tabrizi using two email identities. Major milestones are:
-
-- 2024-05-17: initial commit.
-- 2024-05-18: multicast queue direction, benchmark code, README, and assets.
-- 2025-01-08: SPSC draft.
-- 2025-01-10: SPSC race-related changes and README update.
-- 2025-01-14: public constructor, `unique_ptr` allocation, and removal of
-  tracked IDE/CMake build artifacts.
-- 2025-07-16: MIT license added.
-
-The repository remote is `https://github.com/suhaasgaddala/OrbitQueue.git`.
-Only `main` exists locally and remotely; it tracks `origin/main`. There are no
-tags. The working tree was clean before this document was added.
-
-Source headers identify Reza A. Tabrizi as author. The MIT license grants broad
-rights to use, modify, distribute, and sublicense the software, subject to
-preserving its copyright and permission notice. It disclaims warranty and
-liability.
-
-## 15. Observability and Failure Behavior
+## 14. Observability and Failure Behavior
 
 Observability is limited to two console lines per benchmark scenario: a
 completion message and a total count. There are no logs for configuration,
@@ -503,7 +468,7 @@ Most failures are implicit:
 - Invalid sizes and indices produce undefined behavior rather than diagnostics.
 - Blocking operations have no cancellation path.
 
-## 16. Safe Contribution Boundaries
+## 15. Safe Contribution Boundaries
 
 Until the algorithms are formally corrected and tested, changes should avoid
 making stronger safety or performance claims. Preserve these distinctions:
@@ -520,14 +485,14 @@ For implementation work, prefer small, independently testable stages:
    behavior.
 2. Namespace types and define explicit queue contracts.
 3. Add input validation and shutdown behavior.
-4. Build correctness tests that fail on the current defects.
+4. Build correctness tests that fail on the explored defects.
 5. Redesign synchronization based on stated delivery semantics.
 6. Benchmark only after correctness gates pass.
 
-## 17. Recommended Target Architecture
+## 16. Resulting Architecture
 
-The minimal maintainable direction is a header/library target plus separate
-test and benchmark executables:
+The resulting maintainable architecture is a header/library target plus
+separate test and benchmark executables:
 
 ```text
 include/orbitqueue/
@@ -548,9 +513,9 @@ overflow behavior, progress guarantees, memory ordering, payload constraints,
 and shutdown behavior. Benchmarks should emit machine-readable raw data and
 environment metadata, then generate charts from tracked scripts.
 
-## 18. Priority Roadmap
+## 17. Engineering Work Derived From the Exploration
 
-### P0: Establish correctness and buildability
+### Correctness and buildability
 
 - Remove hard-coded compiler/dependency paths and use target-scoped CMake.
 - Add a library target, CTest, and a basic CI matrix.
@@ -560,7 +525,7 @@ environment metadata, then generate charts from tracked scripts.
 - Replace or redesign the SPMC protocol to eliminate payload races and lost
   consumer state; verify with ThreadSanitizer and sequence-bearing payloads.
 
-### P1: Make behavior usable and inspectable
+### Usability and observability
 
 - Add explicit `try_write`/`try_read` results with meaningful error states.
 - Add close/cancellation semantics to blocking operations.
@@ -568,7 +533,7 @@ environment metadata, then generate charts from tracked scripts.
 - Add warning-clean builds and sanitizer presets.
 - Record dropped, overwritten, and uniquely delivered messages.
 
-### P2: Make performance claims reproducible
+### Reproducible measurement
 
 - Split correctness tests from benchmark code.
 - Normalize payload size and delivery semantics across comparisons.
@@ -577,7 +542,7 @@ environment metadata, then generate charts from tracked scripts.
   environment capture.
 - Track benchmark raw data and chart-generation scripts.
 
-## 19. Contributor Quick Start
+## 18. Contributor Checklist
 
 Before changing concurrency logic:
 
@@ -591,23 +556,20 @@ Before changing concurrency logic:
 6. Run benchmarks only after correctness validation and record the full
    environment.
 
-Do not use the historical bar chart as a regression baseline until its raw data
-and generation process can be reproduced.
+Do not use the illustrative bar chart as a regression baseline; its raw data
+and generation process cannot be reproduced.
 
-## 20. Current Validation Record
+## 19. Exploration Validation Record
 
-This document was produced from a full read of every tracked text/source file,
-repository branch and commit metadata, and both tracked images. Validation on
-2026-06-22 produced these results:
+The experimental mechanisms were evaluated from their complete source and both
+design images. The static validation record was:
 
-- Git state: `main` tracks `origin/main`; no pre-existing modifications.
-- Tracked-file audit: complete; 12 files existed before this document.
 - Isolated `spmc_q.h` Apple Clang 17 C++20 syntax check: passed.
 - Isolated `spsc.h` Apple Clang 17 C++20 syntax check: passed.
 - Full executable syntax check: blocked by missing Boost headers.
 - CMake configure/build/test: not run because `cmake`, Boost, and the declared
-  Homebrew LLVM path are unavailable on the audited machine.
+  Homebrew LLVM path were unavailable in the evaluation environment.
 - Runtime benchmark: not run because the executable could not be built.
 
-No existing source, configuration, asset, or documented workflow was modified
-while creating this context document.
+These results describe only the experimental mechanisms. Current library
+validation is recorded in [`../PROJECT_CONTEXT.md`](../PROJECT_CONTEXT.md).
