@@ -74,7 +74,9 @@ Current non-goals:
 
 ```text
 .
-|-- .github/workflows/ci.yml
+|-- .github/workflows/
+|   |-- ci.yml
+|   `-- verification.yml
 |-- CMakeLists.txt
 |-- README.md
 |-- PROJECT_CONTEXT.md
@@ -106,6 +108,14 @@ Current non-goals:
 |-- stress/
 |   |-- CMakeLists.txt
 |   `-- queue_stress.cpp
+|-- verification/
+|   |-- genmc/
+|   |-- tla/
+|   |-- claims.md
+|   |-- results.md
+|   |-- run_genmc.sh
+|   |-- run_negative_controls.sh
+|   `-- run_tlc.sh
 `-- tests/
     |-- CMakeLists.txt
     |-- benchmark_support_tests.cpp
@@ -326,6 +336,18 @@ ASan/UBSan and TSan are separate supported build configurations. Sanitizers
 inspect only executed schedules and do not prove ordering, no loss, no
 duplication, linearizability, progress, or wraparound behavior.
 
+### 13.4 Bounded model checking
+
+Four TLA+ models check bounded FIFO conservation, SPSC ownership transfer,
+multicast registration/lag semantics, and MPMC sequence-cell claims and reuse.
+Reduced GenMC harnesses check the SPSC/MPMC atomic protocols and multicast mutex
+exclusion under RC11. These artifacts evolve with the implementation and do not
+freeze the API.
+
+The models are executable in CI with pinned tool artifacts. Their scope and
+non-claims are recorded in `verification/claims.md`; current state counts and
+dynamic validation results are recorded in `verification/results.md`.
+
 ## 14. Stress Runner
 
 `orbitqueue_stress` accepts seed, duration, iterations, queue, producer count,
@@ -379,11 +401,13 @@ confidence interval, or ranking claim is produced.
 
 ## 16. Continuous Integration
 
-GitHub Actions currently builds and runs CTest on Ubuntu in Debug and Release.
-Because stress and benchmark smokes are registered with CTest, the default jobs
-exercise them along with package consumption. CI does not currently include
-sanitizer jobs, Windows/macOS, model checking, long stress, performance
-thresholds, coverage, static analysis, or release packaging.
+GitHub Actions builds and runs CTest on Ubuntu in Debug and Release. Because
+stress and benchmark smokes are registered with CTest, the default jobs exercise
+them along with package consumption. A separate verification workflow runs the
+pinned TLC models, GenMC protocol harnesses, and synchronization negative
+controls. CI does not currently include sanitizer jobs, Windows/macOS, long
+stress, performance thresholds, coverage, static analysis, or release
+packaging.
 
 ## 17. Design Boundaries
 
@@ -424,7 +448,7 @@ Primary remaining risks:
 
 | Risk | Current mitigation | Remaining work |
 | --- | --- | --- |
-| MPMC algorithm defect in an unexecuted schedule | 50k contention test, seeded stress, TSan path, documented cell protocol | Model checking, longer scheduled stress, independent review |
+| MPMC algorithm defect in an unexecuted schedule | 50k contention test, seeded stress, TSan, bounded TLC and GenMC protocol checking | Larger models, implementation refinement, independent review |
 | Position/generation wrap | Explicitly unsupported | Define operational limit or wrap-safe comparison model |
 | No MPMC close | External completion and drain in tests/tools | Design separately without weakening try-only correctness |
 | Short read consumes MPMC work | Explicit result and contract test | Caller must size destinations to `N` when loss is unacceptable |
@@ -479,6 +503,20 @@ The project identity milestone was validated locally with Apple Clang 17:
 - short Release benchmark: all ten scenarios reported zero invalid payloads
   and zero validation errors;
 - `git diff --check` and current-facing identity/path audits: passed.
+
+The bounded verification milestone added the following evidence:
+
+- TLC completed all four finite models with no invariant violations;
+- the MPMC TLC model explored 14,265 distinct states across two cell
+  generations;
+- GenMC reported no error for the SPSC, multicast-mutex, or capacity-two MPMC
+  protocol harnesses under RC11;
+- fresh Debug CTest passed 7/7;
+- fresh Release CTest passed 7/7;
+- fresh ASan/UBSan and TSan CTest passed 6/6 each;
+- five small-capacity Release stress seeds completed with zero validation
+  failures, including 200,000 total MPMC pushes and pops;
+- full ASan/UBSan and TSan all-queue stress completed without a report.
 
 ## 20. Contributor Workflow
 

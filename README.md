@@ -99,19 +99,25 @@ wait-free progress.
 flowchart LR
     CONTRACTS["Contracts and memory model"] --> UNIT["Unit and concurrency tests"]
     CONTRACTS --> STRESS["Deterministic seeded stress"]
+    CONTRACTS --> TLC["TLA+ finite-state models"]
     UNIT --> ASAN["ASan / UBSan"]
     UNIT --> TSAN["TSan"]
+    CONTRACTS --> GENMC["GenMC weak-memory protocols"]
     STRESS --> BENCH["Benchmark payload validation"]
     ASAN --> EVIDENCE["Supported implementation claims"]
     TSAN --> EVIDENCE
+    TLC --> EVIDENCE
+    GENMC --> EVIDENCE
     BENCH --> EVIDENCE
     CONTRACTS --> EVIDENCE
 ```
 
 Each layer answers a different question. Tests exercise deterministic
 contracts; stress explores many scheduled operations; sanitizers inspect
-executed paths; benchmark validation rejects corrupt or inconsistent measured
-work. None is a formal proof.
+executed paths; TLC exhaustively checks finite models; GenMC explores reduced
+protocols under the C/C++ weak-memory model; benchmark validation rejects
+corrupt or inconsistent measured work. None is an unbounded refinement proof of
+the complete C++ implementation.
 
 ## Design Evidence
 
@@ -281,3 +287,4 @@ overhead. See [docs/benchmarking.md](docs/benchmarking.md).
 - [Research motivation](docs/research_motivation.md)
 - [Queue design decisions](docs/design_decisions.md)
 - [Queue design explorations](docs/design_explorations.md)
+- [Concurrency verification](verification/README.md)

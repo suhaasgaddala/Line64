@@ -51,6 +51,21 @@ still explore different interleavings.
 Sanitizers do not prove logical ordering, no loss, no duplication, or universal
 race freedom. TSan should be run separately from ASan.
 
+### Bounded model checking
+
+The `verification/tla` models split queue operations at their ownership and
+publication boundaries. TLC exhaustively enumerates every reachable state for
+the checked finite configurations and enforces queue-specific invariants.
+
+Reduced GenMC harnesses mirror the SPSC/MPMC atomic orders and multicast mutex
+exclusion under the RC11 weak-memory model. They are synchronization-protocol
+checks, not compiled instances of the public templates. The actual headers are
+checked by the test, stress, and sanitizer layers.
+
+Passing either model checker establishes only the properties, model, bounds,
+and tool version stated in `verification/claims.md`. It is not an unbounded
+proof that the C++ implementation refines the model.
+
 ### Benchmarks
 
 Benchmarks validate their payloads and fail on detected corruption, but their
@@ -93,8 +108,9 @@ Before merging a synchronization change:
 6. Pass longer seeded stress runs appropriate to the blast radius.
 7. Pass ASan/UBSan and TSan where supported.
 8. Pass downstream package consumption.
-9. Build benchmarks and verify all validation counters remain zero.
-10. Review documentation for stronger claims than the evidence supports.
+9. Run the affected TLC and GenMC verification models.
+10. Build benchmarks and verify all validation counters remain zero.
+11. Review documentation for stronger claims than the evidence supports.
 
 Performance improvement never overrides a failed correctness gate.
 
@@ -104,6 +120,10 @@ Performance improvement never overrides a failed correctness gate.
 - A stress failure identifies a reproducible payload stream and a schedule-
   sensitive defect candidate.
 - A sanitizer report identifies executed undefined or racy behavior.
+- A TLC counterexample identifies an invariant violation in a complete bounded
+  state space.
+- A GenMC counterexample identifies a weak-memory protocol execution that
+  violates a harness assertion.
 - A benchmark validation error identifies corrupt or inconsistent measured work.
 - A throughput change without repeated comparable trials is an observation, not
   a conclusion.
