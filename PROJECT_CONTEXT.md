@@ -86,6 +86,8 @@ Current non-goals:
 |-- CMakeLists.txt
 |-- README.md
 |-- PROJECT_CONTEXT.md
+|-- assets/
+|   `-- line64_global_index_spmc.svg
 |-- benchmarks/
 |   |-- CMakeLists.txt
 |   |-- benchmark_support.h

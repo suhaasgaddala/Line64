@@ -65,7 +65,7 @@ queue_experiment/
 |-- README.md                  Conceptual overview and benchmark narrative
 |-- assets/
 |   |-- benchmark.png          Illustrative benchmark bar chart
-|   `-- spmc_global_indices.png Diagram of a global-index SPMC design
+|   `-- line64_global_index_spmc.svg Diagram of a global-index SPMC design
 `-- src/
     |-- main.cpp               Producers, consumers, benchmark scenarios, entry point
     |-- benchmark.h            Benchmark callable type and declaration
@@ -561,8 +561,8 @@ and generation process cannot be reproduced.
 
 ## 19. Exploration Validation Record
 
-The experimental mechanisms were evaluated from their complete source and both
-design images. The static validation record was:
+The experimental mechanisms were evaluated from their complete source and
+available design assets. The static validation record was:
 
 - Isolated `spmc_q.h` Apple Clang 17 C++20 syntax check: passed.
 - Isolated `spsc.h` Apple Clang 17 C++20 syntax check: passed.

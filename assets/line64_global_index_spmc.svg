@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Global-index SPMC multicast concept</title>
+  <desc id="desc">Concept diagram showing a bounded sequence-numbered ring, producer claim and publish sequence state, independent consumer cursors, retained history, and the overwrite rule gated by the slowest consumer.</desc>
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { fill: #0f172a; font: 700 30px sans-serif; }
+      .subtitle { fill: #334155; font: 400 15px sans-serif; }
+      .label { fill: #0f172a; font: 600 14px sans-serif; }
+      .small { fill: #334155; font: 400 13px sans-serif; }
+      .tiny { fill: #475569; font: 400 12px sans-serif; }
+      .seq { fill: #0f172a; font: 700 16px sans-serif; }
+      .mono { fill: #0f172a; font: 600 13px monospace; }
+      .cell { fill: #f8fafc; stroke: #64748b; stroke-width: 1.2; }
+      .history { fill: #dbeafe; stroke: #2563eb; stroke-width: 1.5; }
+      .writing { fill: #e0f2fe; stroke: #0284c7; stroke-width: 2; }
+      .stale { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1.2; }
+      .line { fill: none; stroke: #334155; stroke-width: 1.6; }
+      .blue-line { fill: none; stroke: #2563eb; stroke-width: 1.8; }
+      .slate-line { fill: none; stroke: #64748b; stroke-width: 1.4; }
+      .rule-line { fill: none; stroke: #0f172a; stroke-width: 1.8; stroke-dasharray: 6 5; }
+      .callout { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.2; }
+      .warn { fill: #fff7ed; stroke: #f97316; stroke-width: 1.3; }
+      .dot { fill: #2563eb; stroke: #ffffff; stroke-width: 2; }
+      .slow-dot { fill: #f97316; stroke: #ffffff; stroke-width: 2; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="blue-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1200" height="760"/>
+  <text class="title" x="60" y="62">Global-index SPMC multicast concept</text>
+  <text class="subtitle" x="60" y="90">One producer publishes a sequence; each consumer keeps an independent cursor.</text>
+  <text class="subtitle" x="60" y="112">The slowest cursor gates the oldest retained sequence.</text>
+
+  <g id="producer-flow">
+    <rect class="callout" x="74" y="126" width="1052" height="78" rx="7"/>
+    <text class="label" x="96" y="156">Producer flow</text>
+    <rect class="history" x="246" y="139" width="154" height="38" rx="5"/>
+    <text class="small" x="268" y="163">reserve sequence</text>
+    <path class="blue-line" d="M 412 158 H 504" marker-end="url(#blue-arrow)"/>
+    <rect class="writing" x="518" y="139" width="126" height="38" rx="5"/>
+    <text class="small" x="549" y="163">write slot</text>
+    <path class="blue-line" d="M 656 158 H 748" marker-end="url(#blue-arrow)"/>
+    <rect class="history" x="762" y="139" width="154" height="38" rx="5"/>
+    <text class="small" x="781" y="163">publish sequence</text>
+  </g>
+
+  <g id="ring">
+    <text class="label" x="94" y="241">Bounded ring shown as sequence-numbered cells</text>
+    <rect class="stale" x="100" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="125" y="294">104</text>
+    <text class="tiny" x="118" y="315">reusable</text>
+
+    <rect class="stale" x="184" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="209" y="294">105</text>
+    <text class="tiny" x="202" y="315">reusable</text>
+
+    <rect class="history" x="268" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="293" y="294">106</text>
+
+    <rect class="history" x="352" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="377" y="294">107</text>
+
+    <rect class="history" x="436" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="461" y="294">108</text>
+
+    <rect class="history" x="520" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="545" y="294">109</text>
+
+    <rect class="history" x="604" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="629" y="294">110</text>
+
+    <rect class="history" x="688" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="713" y="294">111</text>
+
+    <rect class="history" x="772" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="797" y="294">112</text>
+
+    <rect class="writing" x="856" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="881" y="294">113</text>
+    <text class="tiny" x="866" y="315">reserved</text>
+
+    <rect class="cell" x="940" y="264" width="80" height="64" rx="4"/>
+    <text class="seq" x="965" y="294">114</text>
+    <text class="tiny" x="967" y="315">next</text>
+
+    <path class="slate-line" d="M 1028 296 H 1094" marker-end="url(#arrow)"/>
+    <text class="tiny" x="1036" y="320">wraps by slot</text>
+
+    <path class="blue-line" d="M 268 348 H 852"/>
+    <path class="blue-line" d="M 268 340 V 356"/>
+    <path class="blue-line" d="M 852 340 V 356"/>
+    <text class="label" x="468" y="382">retained history window</text>
+
+    <path class="line" d="M 812 244 V 264" marker-end="url(#arrow)"/>
+    <text class="mono" x="764" y="235">publish_seq</text>
+    <text class="tiny" x="791" y="253">112 visible</text>
+
+    <path class="line" d="M 896 244 V 264" marker-end="url(#arrow)"/>
+    <text class="mono" x="870" y="235">claim_seq</text>
+    <text class="tiny" x="866" y="253">113 reserved</text>
+
+    <path class="rule-line" d="M 308 252 V 398"/>
+    <text class="mono" x="228" y="416">min_consumer_seq</text>
+  </g>
+
+  <g id="consumer-flow">
+    <text class="label" x="94" y="459">Consumer flow</text>
+    <text class="small" x="94" y="481">each consumer advances independently</text>
+
+    <path class="line" d="M 728 328 V 508" marker-end="url(#arrow)"/>
+    <circle class="dot" cx="728" cy="508" r="7"/>
+    <text class="label" x="748" y="513">Consumer A cursor</text>
+    <text class="tiny" x="748" y="532">ready to read 112</text>
+
+    <path class="line" d="M 560 328 V 586" marker-end="url(#arrow)"/>
+    <circle class="dot" cx="560" cy="586" r="7"/>
+    <text class="label" x="580" y="591">Consumer B cursor</text>
+    <text class="tiny" x="580" y="610">ready to read 110</text>
+
+    <path class="line" d="M 308 328 V 664" marker-end="url(#arrow)"/>
+    <circle class="slow-dot" cx="308" cy="664" r="7"/>
+    <text class="label" x="328" y="669">Consumer C cursor (slow)</text>
+    <text class="tiny" x="328" y="688">oldest retained sequence</text>
+  </g>
+
+  <g id="overwrite-rule">
+    <rect class="callout" x="74" y="526" width="388" height="86" rx="7"/>
+    <text class="label" x="96" y="557">Overwrite rule</text>
+    <text class="small" x="96" y="580">producer cannot safely overwrite before</text>
+    <text class="mono" x="332" y="580">min_consumer_seq</text>
+  </g>
+
+  <g id="write-callout">
+    <rect class="callout" x="826" y="375" width="212" height="64" rx="7"/>
+    <path class="line" d="M 910 375 L 896 328" marker-end="url(#arrow)"/>
+    <text class="label" x="848" y="404">write in progress</text>
+    <text class="tiny" x="848" y="423">not visible until published</text>
+  </g>
+
+  <g id="warning">
+    <rect class="warn" x="714" y="632" width="412" height="70" rx="7"/>
+    <text class="label" x="736" y="662">Warning</text>
+    <text class="small" x="736" y="684">Shared global sequence state can become a contention point.</text>
+  </g>
+</svg>

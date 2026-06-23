@@ -39,7 +39,7 @@ so delivery is multicast retained history rather than exclusive work sharing.
 
 ### Multicast design evidence
 
-![Global-index multicast ring exploration](assets/spmc_global_indices.png)
+![Global-index multicast ring exploration](../assets/line64_global_index_spmc.svg)
 
 This diagram records the global-index design question: whether localized slot
 state can reduce contention while multiple consumers advance through a bounded

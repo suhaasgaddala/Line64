@@ -64,7 +64,7 @@ reports lag when retained history has been overwritten.
 The global-index illustration below is useful for understanding the contention
 question, but it is not the current synchronization protocol.
 
-![Global-index multicast design exploration](assets/spmc_global_indices.png)
+![Global-index multicast design exploration](../assets/line64_global_index_spmc.svg)
 
 ## Benchmark Decisions
 

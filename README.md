@@ -88,6 +88,28 @@ remove a publication for other consumers. Slow consumers can lose overwritten
 history, receive `consumer_lagged`, and continue from the oldest retained
 sequence.
 
+## Global-index multicast design exploration
+
+![Global-index SPMC multicast concept](assets/line64_global_index_spmc.svg)
+
+In a retained-history multicast queue design, a producer can reserve a sequence,
+write the selected slot, then publish that sequence for consumers to observe.
+Consumers track independent cursor positions, so one fast consumer can advance
+without removing data needed by another. The slowest consumer determines the
+oldest retained sequence, which explains the core tradeoff behind
+retained-history multicast queues: global publication and progress state is
+simple to reason about, but shared state can create contention.
+
+This is a concept/design-exploration diagram, not the exact current
+`SPMCMulticastQueue` synchronization protocol. It is conceptually related to
+David Gross's
+[*Trading at light speed*](https://meetingcpp.com/mcpp/schedule/talkview.php?tid=220)
+talk and Disruptor-style ring-buffer claim/publish/gating designs, including
+the [LMAX Disruptor user guide](https://lmax-exchange.github.io/disruptor/user-guide/index.html)
+and Trisha Gee's
+[*Dissecting the Disruptor: Writing to the ring buffer*](https://trishagee.com/2011/07/04/dissecting_the_disruptor_writing_to_the_ring_buffer/).
+No external copyrighted images are embedded.
+
 ## MPMC Sequence-Cell Flow
 
 ```mermaid
