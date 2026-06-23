@@ -14,16 +14,17 @@ results, and benchmark scenarios that preserve the meaning of each delivery
 model. Correctness checks and synchronization rationale are part of the design,
 not inferred from throughput.
 
-## At a glance
+## Why bounded queues?
 
-- Header-only C++20 library with no mandatory third-party dependency.
-- Includes SPSC, multicast SPMC, blocking MPMC, and mutex-free MPMC queue
-  contracts.
-- Uses deterministic stress validation, ASan/UBSan and TSan build paths, TLA+
-  models, and GenMC protocol artifacts.
-- Emits reproducible JSON benchmark output with payload validation.
-- Explicitly does not claim production readiness, complete formal
-  verification, lock-freedom, or wait-freedom.
+Bounded queues make capacity an explicit part of the contract. Producers cannot
+hide unbounded memory growth behind an enqueue call, and consumers can reason
+about exactly how much retained work or history exists at any point.
+
+That tradeoff is useful for low-latency and systems code because storage can be
+allocated up front, overload is reported as an operation result, and queue
+semantics can stay specific: exclusive handoff, exclusive-pop work sharing, and
+multicast retained history are different contracts with different measurement
+rules.
 
 ## Queue Contracts
 
@@ -88,27 +89,31 @@ remove a publication for other consumers. Slow consumers can lose overwritten
 history, receive `consumer_lagged`, and continue from the oldest retained
 sequence.
 
-## Global-index multicast design exploration
+## Global-index SPMC design exploration
 
-![Global-index SPMC multicast concept](assets/line64_global_index_spmc.svg)
+Early SPMC multicast designs can be explained with a small set of shared
+sequence indices. A producer reserves a slot, writes the payload, and then
+advances a published boundary once the message is visible. Consumers advance
+their own cursor positions independently, while the slowest consumer determines
+the oldest sequence that must remain retained.
 
-In a retained-history multicast queue design, a producer can reserve a sequence,
-write the selected slot, then publish that sequence for consumers to observe.
-Consumers track independent cursor positions, so one fast consumer can advance
-without removing data needed by another. The slowest consumer determines the
-oldest retained sequence, which explains the core tradeoff behind
-retained-history multicast queues: global publication and progress state is
-simple to reason about, but shared state can create contention.
-
-This is a concept/design-exploration diagram, not the exact current
-`SPMCMulticastQueue` synchronization protocol. It is conceptually related to
-David Gross's
-[*Trading at light speed*](https://meetingcpp.com/mcpp/schedule/talkview.php?tid=220)
-talk and Disruptor-style ring-buffer claim/publish/gating designs, including
-the [LMAX Disruptor user guide](https://lmax-exchange.github.io/disruptor/user-guide/index.html)
+This global-index style is conceptually related to David Gross's
+[*Trading at Light Speed*](https://meetingcpp.com/mcpp/schedule/talkview.php?tid=220)
+discussion of low-latency ring-buffer design and to Disruptor-style
+claim/publish/gating models, including the
+[LMAX Disruptor user guide](https://lmax-exchange.github.io/disruptor/user-guide/index.html)
 and Trisha Gee's
 [*Dissecting the Disruptor: Writing to the ring buffer*](https://trishagee.com/2011/07/04/dissecting_the_disruptor_writing_to_the_ring_buffer/).
-No external copyrighted images are embedded.
+The tradeoff is simple: shared sequence state makes the design easy to reason
+about, but those shared indices can become contention points as producer and
+consumer activity grows.
+
+The current Line64 `SPMCMulticastQueue` is intentionally conservative and
+mutex-protected around publication and payload copy. The diagram below is
+design exploration, not a literal claim that the current implementation uses
+this exact synchronization protocol.
+
+![Global-index SPMC multicast concept](assets/line64_global_index_spmc_concept.png)
 
 ## MPMC Sequence-Cell Flow
 
@@ -156,75 +161,58 @@ protocols under the C/C++ weak-memory model; benchmark validation rejects
 corrupt or inconsistent measured work. None is an unbounded refinement proof of
 the complete C++ implementation.
 
-## Benchmarking by Delivery Semantics
+## Performance tests and benchmarks
 
-Benchmarks are grouped by delivery semantics before throughput is compared.
-SPSC queues are compared only against SPSC baselines. MPMC queues are compared
-only against exclusive-pop MPMC baselines. SPMC multicast is reported
-separately because aggregate consumer observations are not directly comparable
-to exclusive-pop throughput.
+Line64 performance tests are grouped by delivery semantics before throughput is
+compared. SPSC queues are compared only against SPSC exclusive-handoff
+baselines. MPMC queues are compared only against exclusive-pop work-sharing
+baselines. SPMC multicast is reported separately because aggregate consumer
+observations are not directly comparable to exclusive-pop throughput.
 
-### SPSC: exclusive handoff
+### MPMC performance tests: exclusive-pop work sharing
 
-Implemented or planned baselines:
+Line64's MPMC queue is compared only against exclusive-pop work-sharing queues.
+In the local Apple M4 performance-test run at capacity `32,768` with `64 B`
+payloads, Line64 `MPMCQueue` ranked first in the tested `1P/1C` and `2P/2C`
+scenarios against the measured baselines shown below.
 
-| Baseline | Status |
-| --- | --- |
-| Line64 `SPSCQueue` | Implemented |
-| `boost::lockfree::spsc_queue` | Optional, disabled by default |
-| `rigtorp/SPSCQueue` | Optional, disabled by default |
-| `folly::ProducerConsumerQueue` | Future work only |
+![Line64 MPMC performance test results](assets/line64_mpmc_selected_topologies.png)
 
-Metric:
+| Queue | 1P/1C mean msg/s | 2P/2C mean msg/s |
+|---|---:|---:|
+| Line64 `MPMCQueue` | 1,895,855 | 3,379,918 |
+| `boost::lockfree::queue` | 1,812,384 | 2,854,875 |
+| `moodycamel::ConcurrentQueue` | 1,770,057 | 3,249,127 |
+| `max0x7ba/atomic_queue` | 1,574,023 | 2,368,352 |
+| Line64 `BlockingQueue` | 1,762,932 | 2,467,672 |
 
-- messages/sec;
-- bytes/sec;
-- failed push/pop attempts;
-- checksum validation.
+Only the topologies where Line64 ranked first are visualized above. The full
+benchmark output should be read for other producer/consumer counts. In the same
+run, other baselines were competitive or faster in some higher-contention
+scenarios, so the project does not claim universal throughput dominance.
 
-### MPMC: exclusive-pop work-sharing
+Performance-test snapshot environment: Apple M4, macOS, AppleClang Release
+build, capacity `32,768`, payload `64 B`, `1s` measured per scenario after
+`250ms` warmup, mean of `3` trials.
 
-Implemented or planned baselines:
+### SPSC performance tests: exclusive handoff
 
-| Baseline | Status |
-| --- | --- |
-| Line64 `MPMCQueue` | Implemented |
-| Line64 `BlockingQueue` | Implemented |
-| `boost::lockfree::queue` | Optional, disabled by default |
-| `moodycamel::ConcurrentQueue` | Optional, disabled by default |
-| `max0x7ba/atomic_queue` | Optional, disabled by default |
+Line64 `SPSCQueue` is benchmarked only against SPSC exclusive-handoff baselines.
+In local Apple M4 testing, Line64 remained competitive with `rigtorp/SPSCQueue`
+and `boost::lockfree::spsc_queue` while preserving the project's fixed-payload
+API, explicit status results, cache-layout isolation, and documentation-focused
+design.
 
-Metric:
+### SPMC performance tests: multicast retained history
 
-- messages/sec;
-- bytes/sec;
-- producer failed tries;
-- consumer failed tries;
-- checksum validation.
+Line64 `SPMCMulticastQueue` is reported separately. A single published message
+may be observed by multiple consumers, so aggregate consumer observations can
+exceed published message throughput. These results are useful for understanding
+multicast retained-history behavior, but they are not directly comparable to
+SPSC or MPMC exclusive-pop throughput.
 
-### SPMC: multicast retained history
-
-Reported separately:
-
-| Baseline | Status |
-| --- | --- |
-| Line64 `SPMCMulticastQueue` | Implemented |
-
-Metric:
-
-- published messages/sec;
-- aggregate consumer observations/sec;
-- per-consumer observations/sec;
-- `consumer_lagged` count;
-- retained history / overwrite behavior.
-
-SPMC multicast results are not directly comparable to exclusive-pop MPMC or
-SPSC throughput.
-
-The benchmark executable emits machine-readable JSON with
-`benchmark_group`, `delivery_semantics`, retry counters, validation counters,
-per-consumer read/rate arrays, and provenance fields so downstream scripts can
-compare only compatible delivery models.
+The benchmark executable emits JSONL so charts can be regenerated from measured
+output instead of hand-written numbers.
 
 ## Quick Start
 
