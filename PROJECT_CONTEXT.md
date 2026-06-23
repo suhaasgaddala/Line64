@@ -21,8 +21,9 @@ When statements disagree, use this order: public headers, executable tests,
 focused contract documents, this snapshot, then supporting documentation.
 
 The library is experimental. It is not claimed production-ready, formally
-verified, wait-free, officially lock-free, or fastest. Mutex-free describes the
-new MPMC implementation; it is not used as a synonym for a progress guarantee.
+verified, wait-free, universally lock-free, or fastest. `SPSCQueue` is the
+library's lock-free queue. Mutex-free describes the new MPMC implementation; it
+is not used as a synonym for a progress guarantee.
 
 Release line: `v0.1.0` is the initial public release tag. Current `main`
 prepares `v0.1.1`, which carries post-release cache-layout consistency,
@@ -34,7 +35,7 @@ existing compatibility names.
 | Type | Producer/consumer model | Delivery | Boundary behavior | Synchronization |
 | --- | --- | --- | --- | --- |
 | `BlockingQueue<T>` | Multiple producers and consumers | Work sharing | Bounded; blocking or `full`/`empty`; close and drain | Mutex and condition variables |
-| `SPSCQueue<N>` | Exactly one producer and one consumer | Work sharing | Bounded; `full`/`empty`; no close | Acquire/release head and tail atomics |
+| `SPSCQueue<N>` | Exactly one producer and one consumer | Work sharing | Bounded; `full`/`empty`; no close | Lock-free acquire/release head and tail atomics |
 | `SPMCMulticastQueue<N>` | One producer and registered consumers | Multicast retained history | Overwrites old history; consumers detect lag | One mutex across publication and copy |
 | `MPMCQueue<N>` | Multiple producers and consumers | Work sharing | Power-of-two bounded; try-only `full`/`empty`; no close | Sequence-numbered cells and CAS position claims; no mutex |
 
@@ -180,6 +181,10 @@ timed waits, stop tokens, reopen, or clear operations.
 
 `SPSCQueue<N>` is a bounded work-sharing ring for exactly one producer and one
 consumer. Additional producers or consumers violate its contract.
+
+`SPSCQueue` is now documented as the library's lock-free queue. The lock-free
+claim is scoped only to SPSC; `MPMCQueue` remains documented as
+mutex-free/CAS-based without lock-free or wait-free progress claims.
 
 The producer owns `head_`, loads it relaxed, and acquires consumer-owned
 `tail_` before deciding whether capacity exists. It fills a `FixedMessage`, then

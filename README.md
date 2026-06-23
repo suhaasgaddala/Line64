@@ -5,8 +5,8 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-C++20 bounded concurrent queues with SPSC, multicast SPMC, mutex-free MPMC,
-stress tests, sanitizers, and reproducible benchmarks.
+Super-fast C++20 bounded concurrent queues: lock-free SPSC, multicast SPMC,
+mutex-free MPMC, and mutex-backed MPMC.
 
 The project studies bounded in-memory queues with named producer and consumer
 contracts, fixed-size payload storage where applicable, explicit operation
@@ -28,12 +28,12 @@ rules.
 
 ## Queue Contracts
 
-| Queue | Concurrency | Delivery | Implementation |
-| --- | --- | --- | --- |
-| `SPSCQueue<N>` | Single producer, single consumer | Work sharing | Bounded fixed-payload ring with acquire/release head and tail ownership |
-| `SPMCMulticastQueue<N>` | Single producer, multiple registered consumers | Multicast retained history | Conservative mutex-protected publication, cursor, and payload-copy protocol |
-| `MPMCQueue<N>` | Multiple producers, multiple consumers | Work sharing | Bounded, mutex-free, power-of-two sequence-cell ring with CAS position claims |
-| `BlockingQueue<T>` | Multiple producers, multiple consumers | Work sharing | Bounded mutex/condition-variable baseline with close and drain behavior |
+| Queue | Contract | Implementation |
+| --- | --- | --- |
+| `SPSCQueue<N>` | Bounded single-producer/single-consumer queue | Lock-free fixed-payload ring for exclusive handoff between one producer and one consumer. |
+| `SPMCMulticastQueue<N>` | Bounded single-producer/multiple-consumer multicast queue | Conservative mutex-protected publication, cursor, and payload-copy protocol |
+| `MPMCQueue<N>` | Bounded multiple-producer/multiple-consumer work-sharing queue | Mutex-free, power-of-two sequence-cell ring with CAS position claims |
+| `BlockingQueue<T>` | Bounded multiple-producer/multiple-consumer work-sharing queue | Mutex-backed condition-variable baseline with close and drain behavior |
 
 The fixed-payload queues accept `std::span`, reject oversized messages, and
 return explicit status, byte-count, and logical-sequence results. Queue
@@ -70,6 +70,11 @@ flowchart LR
 The producer owns `head`; the consumer owns `tail`. Release/acquire handoffs
 publish completed payload bytes and prevent a slot from being reused while the
 consumer is copying it.
+
+`SPSCQueue` is the lock-free queue in the library: it uses atomic
+producer/consumer indices with a single writer per index and provides
+non-blocking `try_push` / `try_pop` operations. This lock-free claim is
+intentionally scoped to the SPSC queue only.
 
 ## SPMC Multicast Flow
 
@@ -346,8 +351,9 @@ overhead. See [docs/benchmarking.md](docs/benchmarking.md).
 ## Non-Claims
 
 - The library is not production-ready or formally verified.
-- Not all queues are lock-free; some deliberately use mutexes.
-- Mutex-free does not automatically mean lock-free or wait-free.
+- Not all queues are lock-free. `SPSCQueue` is lock-free, `MPMCQueue` is
+  mutex-free but does not claim lock-free or wait-free progress,
+  `SPMCMulticastQueue` is mutex-protected, and `BlockingQueue` is mutex-backed.
 - Benchmark completion is not proof of correctness.
 - Throughput from different delivery semantics is not directly comparable.
 - Position and logical-sequence exhaustion remains unsupported.
