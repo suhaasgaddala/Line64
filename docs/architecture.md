@@ -37,15 +37,16 @@ recovery, and payload copies. This prevents a producer from rewriting ordinary
 payload bytes while a consumer reads them. Consumers have independent cursors,
 so delivery is multicast retained history rather than exclusive work sharing.
 
-### Multicast design evidence
+### Multicast retained-history semantics
 
-![Global-index multicast ring exploration](assets/spmc_global_indices.png)
+![SPMC multicast retained-history flow](assets/spmc_multicast_retention.svg)
 
-This diagram records the global-index design question: whether localized slot
-state can reduce contention while multiple consumers advance through a bounded
-ring. The current queue does not implement the depicted index protocol. Its
-value is the question it makes inspectable; the implemented synchronization is
-the mutex-and-cursor contract described above.
+This diagram shows the implemented delivery contract. A single producer
+publishes an ordered stream into bounded retained storage. Each registered
+consumer has an independent cursor, reads do not remove messages for other
+consumers, and consumers that fall behind the retained window receive an
+explicit lag status. The synchronization contract remains the mutex-and-cursor
+contract described above.
 
 `MPMCQueue` is the bounded fixed-payload work-sharing counterpart. It uses a
 preallocated power-of-two cell array, atomic enqueue/dequeue position claims,

@@ -101,18 +101,17 @@ affinity, background load, allocator behavior, and compiler flags can all affect
 results. The metadata is provenance, not full environment capture, and the
 harness does not report latency distributions or statistical significance.
 
-## Semantic comparison evidence
+## Delivery semantics comparison
 
-![Non-comparable benchmark semantics example](assets/benchmark_semantics_example.png)
+![Benchmark delivery semantics comparison](assets/delivery_semantics_comparison.svg)
 
-This chart is retained as a concrete example of a benchmark that cannot support
-a queue ranking. The SPMC series counts aggregate multicast observations while
-the blocking and Boost series count exclusive work-sharing pops. Raw samples,
-machine details, compiler flags, and the generation script are unavailable.
+This diagram makes the benchmark accounting rule explicit. Work-sharing queues
+count exclusive pops, while multicast SPMC counts aggregate consumer
+observations of retained messages. Those totals are different units and must
+not be treated as equivalent queue rankings.
 
-The chart is therefore not a current result or regression baseline. The
-maintained harness addresses these gaps by labeling delivery units, using one
-validated payload format, emitting raw JSON trials, and failing when delivery
+The maintained harness labels delivery units, uses one validated payload
+format, emits raw JSON trials, and fails when delivery
 accounting or payload validation is inconsistent.
 
 ## Optional Boost baseline

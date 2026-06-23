@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="640" viewBox="0 0 1040 640" role="img" aria-labelledby="title desc">
+  <title id="title">Benchmark delivery semantics comparison</title>
+  <desc id="desc">Work-sharing queues count exclusive pops, while multicast queues count consumer observations. Benchmark output keeps these units separate.</desc>
+  <style>
+    .bg { fill: #f8fafc; }
+    .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+    .title { fill: #0f172a; font: 700 30px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .subtitle { fill: #475569; font: 500 15px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .label { fill: #0f172a; font: 700 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .small { fill: #475569; font: 500 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .tiny { fill: #64748b; font: 500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .pub { fill: #dbeafe; stroke: #2563eb; stroke-width: 2; rx: 12; }
+    .consumer { fill: #ecfeff; stroke: #0891b2; stroke-width: 2; rx: 12; }
+    .inactive { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 2; rx: 12; }
+    .formula { fill: #fefce8; stroke: #ca8a04; stroke-width: 1.5; rx: 12; }
+    .warn { fill: #fff1f2; stroke: #e11d48; stroke-width: 1.5; rx: 12; }
+    .chip { fill: #eef2ff; stroke: #6366f1; stroke-width: 1.5; rx: 14; }
+    .arrow { stroke: #0f766e; stroke-width: 3; fill: none; marker-end: url(#arrowhead); stroke-linecap: round; stroke-linejoin: round; }
+    .muted-arrow { stroke: #94a3b8; stroke-width: 2; fill: none; marker-end: url(#mutedhead); stroke-linecap: round; stroke-dasharray: 6 6; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <path d="M0,0 L12,4 L0,8 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="mutedhead" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <path d="M0,0 L12,4 L0,8 Z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1040" height="640"/>
+  <text class="title" x="56" y="62">Benchmark delivery units are different</text>
+  <text class="subtitle" x="56" y="88">The benchmark reports validated work, but work-sharing and multicast queues do not count the same unit.</text>
+
+  <rect class="panel" x="56" y="128" width="438" height="350"/>
+  <rect class="panel" x="546" y="128" width="438" height="350"/>
+
+  <text class="label" x="86" y="168">Work-sharing queues</text>
+  <text class="small" x="86" y="192">SPSC, blocking MPMC, mutex-free MPMC</text>
+
+  <rect class="pub" x="92" y="228" width="118" height="58"/>
+  <text class="label" x="120" y="253">msg 42</text>
+  <text class="tiny" x="118" y="273">one item</text>
+
+  <path class="arrow" d="M214 257 C260 257 286 231 324 231"/>
+  <path class="muted-arrow" d="M214 257 C260 257 286 286 324 286"/>
+  <path class="muted-arrow" d="M214 257 C260 257 286 341 324 341"/>
+
+  <rect class="consumer" x="326" y="206" width="116" height="50"/>
+  <text class="small" x="352" y="236">Consumer A</text>
+  <rect class="inactive" x="326" y="261" width="116" height="50"/>
+  <text class="small" x="352" y="291">Consumer B</text>
+  <rect class="inactive" x="326" y="316" width="116" height="50"/>
+  <text class="small" x="352" y="346">Consumer C</text>
+
+  <rect class="formula" x="90" y="392" width="354" height="56"/>
+  <text class="label" x="114" y="419">one publication -> one successful pop</text>
+  <text class="small" x="114" y="439">aggregate reads track exclusive work</text>
+
+  <text class="label" x="576" y="168">Multicast SPMC queue</text>
+  <text class="small" x="576" y="192">one publication can be observed by each consumer</text>
+
+  <rect class="pub" x="592" y="228" width="118" height="58"/>
+  <text class="label" x="620" y="253">msg 42</text>
+  <text class="tiny" x="618" y="273">one sequence</text>
+
+  <path class="arrow" d="M714 257 C760 257 786 231 824 231"/>
+  <path class="arrow" d="M714 257 C760 257 786 286 824 286"/>
+  <path class="arrow" d="M714 257 C760 257 786 341 824 341"/>
+
+  <rect class="consumer" x="826" y="206" width="116" height="50"/>
+  <text class="small" x="852" y="236">Consumer A</text>
+  <rect class="consumer" x="826" y="261" width="116" height="50"/>
+  <text class="small" x="852" y="291">Consumer B</text>
+  <rect class="consumer" x="826" y="316" width="116" height="50"/>
+  <text class="small" x="852" y="346">Consumer C</text>
+
+  <rect class="formula" x="590" y="392" width="354" height="56"/>
+  <text class="label" x="614" y="419">one publication -> many observations</text>
+  <text class="small" x="614" y="439">aggregate reads are not exclusive pops</text>
+
+  <rect class="warn" x="146" y="512" width="748" height="58"/>
+  <text class="label" x="178" y="538">Do not rank queue types by a single mixed total.</text>
+  <text class="small" x="178" y="558">Benchmark output separates publications, aggregate reads, unique sequences, retries, and invalid payloads.</text>
+
+  <g aria-label="Benchmark output fields">
+    <rect class="chip" x="166" y="592" width="110" height="28"/>
+    <text class="tiny" x="186" y="611">published</text>
+    <rect class="chip" x="292" y="592" width="128" height="28"/>
+    <text class="tiny" x="312" y="611">aggregate_reads</text>
+    <rect class="chip" x="436" y="592" width="134" height="28"/>
+    <text class="tiny" x="456" y="611">unique_sequences</text>
+    <rect class="chip" x="586" y="592" width="104" height="28"/>
+    <text class="tiny" x="606" y="611">retries</text>
+    <rect class="chip" x="706" y="592" width="168" height="28"/>
+    <text class="tiny" x="726" y="611">invalid_payloads</text>
+  </g>
+</svg>

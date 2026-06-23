@@ -61,10 +61,10 @@ starting during that copy. The current implementation therefore holds a mutex
 across publication and copy, tracks each consumer with an owned cursor, and
 reports lag when retained history has been overwritten.
 
-The global-index illustration below is useful for understanding the contention
-question, but it is not the current synchronization protocol.
+The retained-history diagram below shows the current delivery contract rather
+than a rejected per-slot synchronization protocol.
 
-![Global-index multicast design exploration](assets/spmc_global_indices.png)
+![SPMC multicast retained-history flow](assets/spmc_multicast_retention.svg)
 
 ## Benchmark Decisions
 
@@ -74,12 +74,12 @@ consumer observations separately from unique publication IDs. Every measured
 payload carries an ID and checksum so loss, duplication, and corruption can be
 reported instead of hidden by a throughput total.
 
-The chart below is retained as an example of why semantic labels and
-provenance matter. Its raw observations, machine details, compiler flags, and
-generation script are unavailable, and its queues performed different work.
-It is not a current result, regression baseline, or performance claim.
+The diagram below shows why semantic labels matter. Work-sharing queues count
+exclusive pops, while multicast SPMC counts consumer observations of retained
+messages. Those units must be reported separately and must not be collapsed into
+a single queue ranking.
 
-![Non-comparable benchmark example](assets/benchmark_semantics_example.png)
+![Benchmark delivery semantics comparison](assets/delivery_semantics_comparison.svg)
 
 ## Evidence Limits
 
@@ -87,7 +87,7 @@ It is not a current result, regression baseline, or performance claim.
 - Mutex-free does not by itself establish lock-free or wait-free progress.
 - Position and logical-sequence exhaustion remain outside the supported model.
 - Benchmark metadata does not capture every source of system noise.
-- Raw inputs for the illustrative chart cannot be reconstructed.
+- Benchmark diagrams are explanatory contract diagrams, not performance claims.
 - Correctness outside each queue's declared producer/consumer ownership model
   is not claimed.
 

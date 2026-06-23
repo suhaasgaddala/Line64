@@ -136,25 +136,27 @@ the complete C++ implementation.
 
 ## Design Evidence
 
-### Multicast index exploration
+### SPMC multicast retained-history flow
 
-![Global-index multicast ring exploration](docs/assets/spmc_global_indices.png)
+![SPMC multicast retained-history flow](docs/assets/spmc_multicast_retention.svg)
 
-The blue ring captures the index-contention question behind the multicast
-research: consumers can advance independently while a producer publishes into
-bounded storage. It is design evidence, not the current synchronization
-protocol. `SPMCMulticastQueue` owns consumer cursors and uses a mutex across
-publication and payload copy to prevent writer/reader data races.
+`SPMCMulticastQueue` publishes one ordered stream from a single producer into a
+bounded retained window. Each registered consumer owns its own cursor, so a read
+does not remove the message for other consumers. Slow consumers can resume while
+their cursor remains inside the retained window and receive an explicit lag
+status when retained history has moved past them. Publication, cursor
+inspection, and payload copy are serialized by the queue mutex.
 
-### Benchmark semantics example
+### Benchmark delivery semantics
 
-![Non-comparable benchmark semantics example](docs/assets/benchmark_semantics_example.png)
+![Benchmark delivery semantics comparison](docs/assets/delivery_semantics_comparison.svg)
 
-The red chart demonstrates why a throughput total needs a delivery contract.
-Its SPMC bars count multicast observations while the baselines count exclusive
-pops, so the bars are not equivalent work and are not a current performance
-claim. The maintained benchmark emits separate publication, aggregate-read,
-unique-sequence, retry, and validation fields.
+Work-sharing queues count exclusive pops: once a consumer takes a message, that
+message is no longer available to other consumers. Multicast SPMC counts
+consumer observations of retained messages, so aggregate reads can exceed the
+number of unique publications. The maintained benchmark keeps publication,
+aggregate-read, unique-sequence, retry, and validation fields separate instead
+of treating one mixed total as a queue ranking.
 
 ## Quick Start
 
