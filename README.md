@@ -1,7 +1,7 @@
 # Bounded Concurrent Queues for C++20
 
-[![CI](https://github.com/suhaasgaddala/bounded-concurrent-queues/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/suhaasgaddala/bounded-concurrent-queues/actions/workflows/ci.yml)
-[![Verification](https://github.com/suhaasgaddala/bounded-concurrent-queues/actions/workflows/verification.yml/badge.svg?branch=main)](https://github.com/suhaasgaddala/bounded-concurrent-queues/actions/workflows/verification.yml)
+[![CI](https://github.com/suhaasgaddala/Line64/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/suhaasgaddala/Line64/actions/workflows/ci.yml)
+[![Verification](https://github.com/suhaasgaddala/Line64/actions/workflows/verification.yml/badge.svg?branch=main)](https://github.com/suhaasgaddala/Line64/actions/workflows/verification.yml)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
