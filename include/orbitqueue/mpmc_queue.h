@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <new>
 #include <span>
 #include <stdexcept>
 
@@ -34,13 +35,13 @@ public:
             return {QueueStatus::message_too_large, 0};
         }
 
-        auto position = enqueue_pos_.load(std::memory_order_relaxed);
+        auto position = enqueue_pos_.value.load(std::memory_order_relaxed);
         Cell* cell = nullptr;
         for (;;) {
             cell = &cells_[position & mask_];
             const auto sequence = cell->sequence.load(std::memory_order_acquire);
             if (sequence == position) {
-                if (enqueue_pos_.compare_exchange_weak(
+                if (enqueue_pos_.value.compare_exchange_weak(
                         position, position + 1,
                         std::memory_order_relaxed,
                         std::memory_order_relaxed)) {
@@ -49,7 +50,7 @@ public:
             } else if (sequence < position) {
                 return {QueueStatus::full, 0};
             } else {
-                position = enqueue_pos_.load(std::memory_order_relaxed);
+                position = enqueue_pos_.value.load(std::memory_order_relaxed);
             }
         }
 
@@ -61,13 +62,13 @@ public:
 
     [[nodiscard]] ReadResult try_pop(
         const std::span<std::byte> destination) noexcept {
-        auto position = dequeue_pos_.load(std::memory_order_relaxed);
+        auto position = dequeue_pos_.value.load(std::memory_order_relaxed);
         Cell* cell = nullptr;
         for (;;) {
             cell = &cells_[position & mask_];
             const auto sequence = cell->sequence.load(std::memory_order_acquire);
             if (sequence == position + 1) {
-                if (dequeue_pos_.compare_exchange_weak(
+                if (dequeue_pos_.value.compare_exchange_weak(
                         position, position + 1,
                         std::memory_order_relaxed,
                         std::memory_order_relaxed)) {
@@ -76,7 +77,7 @@ public:
             } else if (sequence < position + 1) {
                 return {QueueStatus::empty, 0, 0};
             } else {
-                position = dequeue_pos_.load(std::memory_order_relaxed);
+                position = dequeue_pos_.value.load(std::memory_order_relaxed);
             }
         }
 
@@ -89,19 +90,37 @@ public:
     [[nodiscard]] std::size_t capacity() const noexcept { return capacity_; }
 
     [[nodiscard]] bool empty() const noexcept {
-        const auto position = dequeue_pos_.load(std::memory_order_relaxed);
+        const auto position = dequeue_pos_.value.load(std::memory_order_relaxed);
         const auto& cell = cells_[position & mask_];
         const auto sequence = cell.sequence.load(std::memory_order_acquire);
         return sequence < position + 1;
     }
 
 private:
+#if defined(__cpp_lib_hardware_interference_size)
+    static constexpr std::size_t cache_line_size =
+        std::hardware_destructive_interference_size;
+#else
     static constexpr std::size_t cache_line_size = 64;
+#endif
 
     struct alignas(cache_line_size) Cell {
         std::atomic<std::size_t> sequence{};
         FixedMessage<MaxPayloadSize> message;
     };
+
+    struct alignas(cache_line_size) PaddedAtomicSize {
+        std::atomic<std::size_t> value{};
+    };
+
+    // Cell alignment reduces false sharing between adjacent ring cells, and
+    // padded counters reduce producer/consumer position-counter false sharing.
+    // This is a cache-locality mitigation, not a correctness guarantee; actual
+    // hardware cache-line behavior remains platform-dependent.
+    static_assert(alignof(Cell) >= cache_line_size);
+    static_assert(sizeof(Cell) % cache_line_size == 0);
+    static_assert(alignof(PaddedAtomicSize) >= cache_line_size);
+    static_assert(sizeof(PaddedAtomicSize) % cache_line_size == 0);
 
     [[nodiscard]] static std::size_t validate_capacity(
         const std::size_t capacity) {
@@ -115,8 +134,8 @@ private:
     const std::size_t capacity_;
     const std::size_t mask_;
     std::unique_ptr<Cell[]> cells_;
-    alignas(cache_line_size) std::atomic<std::size_t> enqueue_pos_{};
-    alignas(cache_line_size) std::atomic<std::size_t> dequeue_pos_{};
+    PaddedAtomicSize enqueue_pos_{};
+    PaddedAtomicSize dequeue_pos_{};
 };
 
 } // namespace orbitqueue
