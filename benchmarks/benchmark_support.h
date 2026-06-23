@@ -103,8 +103,22 @@ private:
     return output.str();
 }
 
+template <typename Value>
+void append_json_array(std::ostringstream& output, const std::vector<Value>& values) {
+    output << '[';
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        if (index != 0) {
+            output << ',';
+        }
+        output << values[index];
+    }
+    output << ']';
+}
+
 struct Result {
+    std::string benchmark_group;
     std::string queue;
+    std::string delivery_semantics;
     std::uint32_t trial{};
     std::size_t capacity{};
     std::size_t payload_size{};
@@ -122,6 +136,9 @@ struct Result {
     std::uint64_t validation_errors{};
     double throughput_messages_per_second{};
     double throughput_reads_per_second{};
+    double throughput_bytes_per_second{};
+    std::vector<std::uint64_t> consumer_reads;
+    std::vector<double> consumer_reads_per_second;
     std::string build_type;
     std::string compiler;
     std::string git_commit;
@@ -132,28 +149,51 @@ struct Result {
 [[nodiscard]] inline std::string to_json(const Result& result) {
     std::ostringstream output;
     output << std::setprecision(12)
-           << "{\"queue\":\"" << json_escape(result.queue)
+           << "{\"benchmark_group\":\"" << json_escape(result.benchmark_group)
+           << "\",\"queue\":\"" << json_escape(result.queue)
+           << "\",\"delivery_semantics\":\""
+           << json_escape(result.delivery_semantics)
            << "\",\"trial\":" << result.trial
            << ",\"capacity\":" << result.capacity
            << ",\"payload_size\":" << result.payload_size
+           << ",\"payload_bytes\":" << result.payload_size
            << ",\"producer_count\":" << result.producer_count
+           << ",\"producers\":" << result.producer_count
            << ",\"consumer_count\":" << result.consumer_count
+           << ",\"consumers\":" << result.consumer_count
            << ",\"duration_ms\":" << result.duration_ms
+           << ",\"duration_seconds\":"
+           << (static_cast<double>(result.duration_ms) / 1000.0)
            << ",\"warmup_ms\":" << result.warmup_ms
            << ",\"messages_published\":" << result.messages_published
+           << ",\"messages_produced\":" << result.messages_published
            << ",\"aggregate_reads\":" << result.aggregate_reads
+           << ",\"messages_consumed\":" << result.aggregate_reads
            << ",\"unique_sequences_verified\":"
            << result.unique_sequences_verified
            << ",\"dropped_or_lagged\":" << result.dropped_or_lagged
            << ",\"invalid_payloads\":" << result.invalid_payloads
            << ",\"full_retries\":" << result.full_retries
+           << ",\"producer_failed_tries\":" << result.full_retries
            << ",\"empty_retries\":" << result.empty_retries
+           << ",\"consumer_failed_tries\":" << result.empty_retries
+           << ",\"consumer_lagged_count\":" << result.dropped_or_lagged
            << ",\"validation_errors\":" << result.validation_errors
+           << ",\"validation\":\""
+           << (result.validation_errors == 0 ? "passed" : "failed") << '"'
            << ",\"throughput_messages_per_second\":"
+           << result.throughput_messages_per_second
+           << ",\"messages_per_second\":"
            << result.throughput_messages_per_second
            << ",\"throughput_reads_per_second\":"
            << result.throughput_reads_per_second
-           << ",\"build_type\":\"" << json_escape(result.build_type)
+           << ",\"bytes_per_second\":"
+           << result.throughput_bytes_per_second;
+    output << ",\"consumer_reads\":";
+    append_json_array(output, result.consumer_reads);
+    output << ",\"consumer_reads_per_second\":";
+    append_json_array(output, result.consumer_reads_per_second);
+    output << ",\"build_type\":\"" << json_escape(result.build_type)
            << "\",\"compiler\":\"" << json_escape(result.compiler)
            << "\",\"git_commit\":\"" << json_escape(result.git_commit)
            << "\",\"timestamp\":\"" << json_escape(result.timestamp)

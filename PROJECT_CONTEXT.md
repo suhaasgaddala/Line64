@@ -89,6 +89,7 @@ Current non-goals:
 |-- benchmarks/
 |   |-- CMakeLists.txt
 |   |-- benchmark_support.h
+|   |-- external_baselines/
 |   `-- queue_benchmark.cpp
 |-- cmake/OrbitQueueConfig.cmake.in
 |-- docs/
@@ -304,6 +305,10 @@ C++20, include paths, warning policy, and optional sanitizer flags.
 | `ORBITQUEUE_BUILD_BENCHMARKS` | `ON` | JSON benchmark executable |
 | `ORBITQUEUE_BUILD_STRESS` | `ON` | Deterministic-input stress executable |
 | `ORBITQUEUE_ENABLE_BOOST_BENCHMARKS` | `OFF` | Optional Boost benchmark scenarios |
+| `ORBITQUEUE_ENABLE_MOODYCAMEL_BENCHMARKS` | `OFF` | Optional moodycamel benchmark scenarios |
+| `ORBITQUEUE_ENABLE_RIGTORP_BENCHMARKS` | `OFF` | Optional rigtorp benchmark scenarios |
+| `ORBITQUEUE_ENABLE_ATOMIC_QUEUE_BENCHMARKS` | `OFF` | Optional atomic_queue benchmark scenarios |
+| `LINE64_ENABLE_*_BENCHMARKS` | `OFF` | Line64-facing aliases for the matching `ORBITQUEUE_ENABLE_*` options |
 | `ORBITQUEUE_ENABLE_WARNINGS` | `ON` | `/W4` or strict GCC/Clang warnings |
 | `ORBITQUEUE_ENABLE_SANITIZERS` | `OFF` | Selected sanitizer compile/link flags |
 | `ORBITQUEUE_SANITIZERS` | `address,undefined` | Sanitizer list when enabled |
@@ -321,8 +326,10 @@ for source/package compatibility. These are compatibility names, not old
 project branding. Broad package renaming remains outside this metadata
 milestone.
 
-Boost remains benchmark-only, optional, and default OFF. Missing Boost headers
-warn and omit only Boost scenarios.
+External benchmark baselines remain benchmark-only, optional, and default OFF.
+Missing Boost headers warn and omit only Boost scenarios. moodycamel, rigtorp,
+and atomic_queue are pinned header-only FetchContent baselines fetched only when
+their flags are enabled.
 
 ## 13. Correctness Infrastructure
 
@@ -399,23 +406,27 @@ duration, warmup, trials, capacity, payload size, producers, consumers, and
 queue selection. Every warmup and measured trial validates generated payloads;
 any validation error makes the process fail.
 
-Default scenarios:
+Default scenarios are grouped by delivery semantics:
 
-- SPSC: 1 producer / 1 consumer;
-- SPMC: 1 producer / 1, 3, and 10 consumers;
-- blocking: 1 producer / 1, 3, and 10 consumers;
-- MPMC: 1/1, 4/4, and 4/10;
-- optional Boost: 1 producer / 1, 3, and 10 consumers.
+- SPSC exclusive handoff: Line64 SPSC, 1 producer / 1 consumer;
+- SPMC multicast retained history: Line64 SPMC, 1 producer / 1, 3, and 10 consumers;
+- MPMC exclusive-pop work sharing: Line64 blocking and mutex-free MPMC,
+  1/1, 2/2, 4/4, and 8/8;
+- optional SPSC baselines: Boost SPSC and rigtorp SPSC, 1 producer / 1 consumer;
+- optional MPMC baselines: Boost, moodycamel, and atomic_queue,
+  1/1, 2/2, 4/4, and 8/8.
 
 Output includes queue, trial, capacity, payload size, worker counts, duration,
 warmup, publications, aggregate reads, unique IDs, lag, invalid payloads,
-full/empty retries, validation errors, both throughput units, build type,
-compiler, git commit, UTC timestamp, and semantic notes.
+full/empty retries, validation errors, validation summary, messages/sec,
+bytes/sec, per-consumer read/rate arrays, build type, compiler, git commit, UTC
+timestamp, and semantic notes.
 
 Work-sharing trials require one valid read per publication after drain. SPMC
 aggregate reads are multicast observations and are not treated as unique pops.
-The harness retains observed IDs during a trial for duplicate/loss detection;
-validation therefore adds CPU and memory overhead to measured work.
+The harness retains successful publication IDs and observed IDs during a trial
+for duplicate, loss, and unexpected-payload detection; validation therefore adds
+CPU and memory overhead to measured work.
 
 Metadata does not capture CPU topology, frequency, affinity, operating-system
 noise, or the standard library. Raw trials are emitted without in-process
@@ -589,6 +600,8 @@ Before changing synchronization:
 
 - Add macOS and Windows compiler coverage.
 - Validate optional Boost scenarios in a Boost-equipped job.
+- Consider CI coverage for fetched optional baselines without making default CI
+  depend on third-party queue libraries.
 - Test declared minimum CMake and installed-target warning/sanitizer behavior.
 
 ### P2: MPMC API research

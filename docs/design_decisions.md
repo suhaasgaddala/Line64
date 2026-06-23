@@ -16,7 +16,7 @@ Public headers and executable tests remain the source of truth.
 | MPMC work sharing | `MPMCQueue<N>` with sequence-numbered cells, CAS position claims, power-of-two capacity, and try-only operations |
 | Benchmark payload | One sequence-bearing, checksummed representation shared by every scenario |
 | Measurement output | Machine-readable trials with workload, validation, retry, throughput, and build metadata |
-| Optional baseline | Boost.Lockfree benchmark scenarios behind `ORBITQUEUE_ENABLE_BOOST_BENCHMARKS=ON` |
+| Optional baselines | Boost.Lockfree, moodycamel, rigtorp, and atomic_queue benchmark scenarios behind disabled-by-default flags |
 
 ## Alternatives Excluded From Public APIs
 
@@ -74,12 +74,11 @@ consumer observations separately from unique publication IDs. Every measured
 payload carries an ID and checksum so loss, duplication, and corruption can be
 reported instead of hidden by a throughput total.
 
-The chart below is retained as an example of why semantic labels and
-provenance matter. Its raw observations, machine details, compiler flags, and
-generation script are unavailable, and its queues performed different work.
-It is not a current result, regression baseline, or performance claim.
-
-![Non-comparable benchmark example](assets/benchmark_semantics_example.png)
+The benchmark harness groups scenarios by delivery semantics before throughput
+is compared. SPSC exclusive handoff, MPMC exclusive-pop work sharing, and SPMC
+multicast retained history are separate groups. Optional external baselines are
+compiled only when explicitly enabled and use the same payload validation and
+retry accounting as the matching Line64 group.
 
 ## Evidence Limits
 
@@ -87,7 +86,8 @@ It is not a current result, regression baseline, or performance claim.
 - Mutex-free does not by itself establish lock-free or wait-free progress.
 - Position and logical-sequence exhaustion remain outside the supported model.
 - Benchmark metadata does not capture every source of system noise.
-- Raw inputs for the illustrative chart cannot be reconstructed.
+- Benchmark diagrams and tables are explanatory contract material, not
+  performance claims.
 - Correctness outside each queue's declared producer/consumer ownership model
   is not claimed.
 

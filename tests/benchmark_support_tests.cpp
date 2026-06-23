@@ -26,7 +26,9 @@ void run_benchmark_support_tests() {
            "sequence range union must count unique values across consumers");
 
     Result result;
+    result.benchmark_group = "example_group";
     result.queue = "example\nqueue";
+    result.delivery_semantics = "exclusive_pop";
     result.trial = 2;
     result.capacity = 16;
     result.payload_size = 32;
@@ -44,21 +46,37 @@ void run_benchmark_support_tests() {
     result.validation_errors = 3;
     result.throughput_messages_per_second = 4000.0;
     result.throughput_reads_per_second = 3600.0;
+    result.throughput_bytes_per_second = 115200.0;
+    result.consumer_reads = {30, 31, 29};
+    result.consumer_reads_per_second = {1200.0, 1240.0, 1160.0};
     result.build_type = "Release";
     result.compiler = "Example 1.0";
     result.git_commit = "abc123";
     result.timestamp = "2026-06-22T00:00:00Z";
     result.notes = "quoted: \"value\"";
     const std::string expected =
-        "{\"queue\":\"example\\nqueue\",\"trial\":2,\"capacity\":16,"
-        "\"payload_size\":32,\"producer_count\":1,\"consumer_count\":3,"
-        "\"duration_ms\":25,\"warmup_ms\":5,"
-        "\"messages_published\":100,\"aggregate_reads\":90,"
+        "{\"benchmark_group\":\"example_group\","
+        "\"queue\":\"example\\nqueue\","
+        "\"delivery_semantics\":\"exclusive_pop\","
+        "\"trial\":2,\"capacity\":16,"
+        "\"payload_size\":32,\"payload_bytes\":32,"
+        "\"producer_count\":1,\"producers\":1,"
+        "\"consumer_count\":3,\"consumers\":3,"
+        "\"duration_ms\":25,\"duration_seconds\":0.025,\"warmup_ms\":5,"
+        "\"messages_published\":100,\"messages_produced\":100,"
+        "\"aggregate_reads\":90,\"messages_consumed\":90,"
         "\"unique_sequences_verified\":80,\"dropped_or_lagged\":2,"
-        "\"invalid_payloads\":1,\"full_retries\":7,\"empty_retries\":9,"
-        "\"validation_errors\":3,"
+        "\"invalid_payloads\":1,\"full_retries\":7,"
+        "\"producer_failed_tries\":7,\"empty_retries\":9,"
+        "\"consumer_failed_tries\":9,\"consumer_lagged_count\":2,"
+        "\"validation_errors\":3,\"validation\":\"failed\","
         "\"throughput_messages_per_second\":4000,"
-        "\"throughput_reads_per_second\":3600,\"build_type\":\"Release\","
+        "\"messages_per_second\":4000,"
+        "\"throughput_reads_per_second\":3600,"
+        "\"bytes_per_second\":115200,"
+        "\"consumer_reads\":[30,31,29],"
+        "\"consumer_reads_per_second\":[1200,1240,1160],"
+        "\"build_type\":\"Release\","
         "\"compiler\":\"Example 1.0\",\"git_commit\":\"abc123\","
         "\"timestamp\":\"2026-06-22T00:00:00Z\","
         "\"notes\":\"quoted: \\\"value\\\"\"}";

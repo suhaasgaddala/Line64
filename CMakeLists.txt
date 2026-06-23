@@ -10,10 +10,41 @@ option(ORBITQUEUE_BUILD_BENCHMARKS "Build bounded queue benchmarks" ON)
 option(ORBITQUEUE_BUILD_STRESS "Build deterministic queue stress runner" ON)
 option(ORBITQUEUE_ENABLE_BOOST_BENCHMARKS
     "Enable optional Boost.Lockfree benchmark scenarios" OFF)
+option(ORBITQUEUE_ENABLE_MOODYCAMEL_BENCHMARKS
+    "Enable optional moodycamel::ConcurrentQueue benchmark scenarios" OFF)
+option(ORBITQUEUE_ENABLE_RIGTORP_BENCHMARKS
+    "Enable optional rigtorp::SPSCQueue benchmark scenarios" OFF)
+option(ORBITQUEUE_ENABLE_ATOMIC_QUEUE_BENCHMARKS
+    "Enable optional atomic_queue benchmark scenarios" OFF)
+option(LINE64_ENABLE_BOOST_BENCHMARKS
+    "Alias for ORBITQUEUE_ENABLE_BOOST_BENCHMARKS" OFF)
+option(LINE64_ENABLE_MOODYCAMEL_BENCHMARKS
+    "Alias for ORBITQUEUE_ENABLE_MOODYCAMEL_BENCHMARKS" OFF)
+option(LINE64_ENABLE_RIGTORP_BENCHMARKS
+    "Alias for ORBITQUEUE_ENABLE_RIGTORP_BENCHMARKS" OFF)
+option(LINE64_ENABLE_ATOMIC_QUEUE_BENCHMARKS
+    "Alias for ORBITQUEUE_ENABLE_ATOMIC_QUEUE_BENCHMARKS" OFF)
 option(ORBITQUEUE_ENABLE_WARNINGS "Enable strong compiler warnings" ON)
 option(ORBITQUEUE_ENABLE_SANITIZERS "Enable compiler sanitizers" OFF)
 set(ORBITQUEUE_SANITIZERS "address,undefined" CACHE STRING
     "Comma-separated sanitizers used when ORBITQUEUE_ENABLE_SANITIZERS is ON")
+
+if(LINE64_ENABLE_BOOST_BENCHMARKS)
+    set(ORBITQUEUE_ENABLE_BOOST_BENCHMARKS ON CACHE BOOL
+        "Enable optional Boost.Lockfree benchmark scenarios" FORCE)
+endif()
+if(LINE64_ENABLE_MOODYCAMEL_BENCHMARKS)
+    set(ORBITQUEUE_ENABLE_MOODYCAMEL_BENCHMARKS ON CACHE BOOL
+        "Enable optional moodycamel::ConcurrentQueue benchmark scenarios" FORCE)
+endif()
+if(LINE64_ENABLE_RIGTORP_BENCHMARKS)
+    set(ORBITQUEUE_ENABLE_RIGTORP_BENCHMARKS ON CACHE BOOL
+        "Enable optional rigtorp::SPSCQueue benchmark scenarios" FORCE)
+endif()
+if(LINE64_ENABLE_ATOMIC_QUEUE_BENCHMARKS)
+    set(ORBITQUEUE_ENABLE_ATOMIC_QUEUE_BENCHMARKS ON CACHE BOOL
+        "Enable optional atomic_queue benchmark scenarios" FORCE)
+endif()
 
 add_library(orbitqueue INTERFACE)
 add_library(OrbitQueue::orbitqueue ALIAS orbitqueue)

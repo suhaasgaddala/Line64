@@ -23,18 +23,86 @@ target_compile_definitions(orbitqueue_benchmark PRIVATE
 if(ORBITQUEUE_ENABLE_BOOST_BENCHMARKS)
     find_path(ORBITQUEUE_BOOST_LOCKFREE_INCLUDE_DIR
         NAMES boost/lockfree/queue.hpp)
+    find_path(ORBITQUEUE_BOOST_LOCKFREE_SPSC_INCLUDE_DIR
+        NAMES boost/lockfree/spsc_queue.hpp)
 
     if(ORBITQUEUE_BOOST_LOCKFREE_INCLUDE_DIR)
         target_compile_definitions(orbitqueue_benchmark PRIVATE
-            ORBITQUEUE_HAVE_BOOST_LOCKFREE=1)
-        target_include_directories(orbitqueue_benchmark PRIVATE
+            ORBITQUEUE_HAVE_BOOST_LOCKFREE_QUEUE=1)
+        target_include_directories(orbitqueue_benchmark SYSTEM PRIVATE
             "${ORBITQUEUE_BOOST_LOCKFREE_INCLUDE_DIR}")
-        message(STATUS "Bounded queue Boost.Lockfree benchmarks enabled")
+        message(STATUS "Bounded queue Boost.Lockfree MPMC benchmarks enabled")
     else()
         message(WARNING
             "ORBITQUEUE_ENABLE_BOOST_BENCHMARKS is ON, but "
-            "boost/lockfree/queue.hpp was not found; Boost scenarios are disabled")
+            "boost/lockfree/queue.hpp was not found; Boost MPMC scenarios are disabled")
     endif()
+
+    if(ORBITQUEUE_BOOST_LOCKFREE_SPSC_INCLUDE_DIR)
+        target_compile_definitions(orbitqueue_benchmark PRIVATE
+            ORBITQUEUE_HAVE_BOOST_LOCKFREE_SPSC=1)
+        target_include_directories(orbitqueue_benchmark SYSTEM PRIVATE
+            "${ORBITQUEUE_BOOST_LOCKFREE_SPSC_INCLUDE_DIR}")
+        message(STATUS "Bounded queue Boost.Lockfree SPSC benchmarks enabled")
+    else()
+        message(WARNING
+            "ORBITQUEUE_ENABLE_BOOST_BENCHMARKS is ON, but "
+            "boost/lockfree/spsc_queue.hpp was not found; Boost SPSC scenarios are disabled")
+    endif()
+endif()
+
+if(ORBITQUEUE_ENABLE_MOODYCAMEL_BENCHMARKS OR
+   ORBITQUEUE_ENABLE_RIGTORP_BENCHMARKS OR
+   ORBITQUEUE_ENABLE_ATOMIC_QUEUE_BENCHMARKS)
+    include(FetchContent)
+endif()
+
+if(ORBITQUEUE_ENABLE_MOODYCAMEL_BENCHMARKS)
+    FetchContent_Declare(orbitqueue_moodycamel_concurrentqueue
+        GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+        GIT_TAG 9afb99746f0f5fc94ac8aef737053ae0481ba8d1
+        SOURCE_SUBDIR cmake/line64-header-only)
+    FetchContent_GetProperties(orbitqueue_moodycamel_concurrentqueue)
+    if(NOT orbitqueue_moodycamel_concurrentqueue_POPULATED)
+        FetchContent_MakeAvailable(orbitqueue_moodycamel_concurrentqueue)
+    endif()
+    target_compile_definitions(orbitqueue_benchmark PRIVATE
+        ORBITQUEUE_HAVE_MOODYCAMEL_CONCURRENTQUEUE=1)
+    target_include_directories(orbitqueue_benchmark SYSTEM PRIVATE
+        "${orbitqueue_moodycamel_concurrentqueue_SOURCE_DIR}")
+    message(STATUS "Bounded queue moodycamel::ConcurrentQueue benchmarks enabled")
+endif()
+
+if(ORBITQUEUE_ENABLE_RIGTORP_BENCHMARKS)
+    FetchContent_Declare(orbitqueue_rigtorp_spscqueue
+        GIT_REPOSITORY https://github.com/rigtorp/SPSCQueue.git
+        GIT_TAG 565a5149d54930463d58cb0f69b978d439555e66
+        SOURCE_SUBDIR cmake/line64-header-only)
+    FetchContent_GetProperties(orbitqueue_rigtorp_spscqueue)
+    if(NOT orbitqueue_rigtorp_spscqueue_POPULATED)
+        FetchContent_MakeAvailable(orbitqueue_rigtorp_spscqueue)
+    endif()
+    target_compile_definitions(orbitqueue_benchmark PRIVATE
+        ORBITQUEUE_HAVE_RIGTORP_SPSCQUEUE=1)
+    target_include_directories(orbitqueue_benchmark SYSTEM PRIVATE
+        "${orbitqueue_rigtorp_spscqueue_SOURCE_DIR}/include")
+    message(STATUS "Bounded queue rigtorp::SPSCQueue benchmarks enabled")
+endif()
+
+if(ORBITQUEUE_ENABLE_ATOMIC_QUEUE_BENCHMARKS)
+    FetchContent_Declare(orbitqueue_atomic_queue
+        GIT_REPOSITORY https://github.com/max0x7ba/atomic_queue.git
+        GIT_TAG c3eeb3d7bf85e8a6414294f5510681b7a595f97c
+        SOURCE_SUBDIR cmake/line64-header-only)
+    FetchContent_GetProperties(orbitqueue_atomic_queue)
+    if(NOT orbitqueue_atomic_queue_POPULATED)
+        FetchContent_MakeAvailable(orbitqueue_atomic_queue)
+    endif()
+    target_compile_definitions(orbitqueue_benchmark PRIVATE
+        ORBITQUEUE_HAVE_ATOMIC_QUEUE=1)
+    target_include_directories(orbitqueue_benchmark SYSTEM PRIVATE
+        "${orbitqueue_atomic_queue_SOURCE_DIR}/include")
+    message(STATUS "Bounded queue atomic_queue benchmarks enabled")
 endif()
 
 if(ORBITQUEUE_BUILD_TESTS)

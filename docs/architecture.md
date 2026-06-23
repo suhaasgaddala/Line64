@@ -18,7 +18,7 @@ flowchart LR
     BENCH --> MPMC
     BENCH --> SPSC
     BENCH --> SPMC
-    BOOST["Optional Boost.Lockfree baseline"] -. "OFF by default" .-> BENCH
+    EXT["Optional external baselines"] -. "OFF by default" .-> BENCH
 ```
 
 Queue contracts precede optimization. Capacity, producer and consumer
@@ -82,6 +82,8 @@ SPMC reports multicast observations, and work-sharing queues validate unique
 delivery after drain. Shared helpers retain validated IDs to detect duplicate
 or missing work.
 
-Boost is discovered only when `ORBITQUEUE_ENABLE_BOOST_BENCHMARKS=ON`. Missing
-headers disable those optional scenarios without affecting the core library,
-tests, installation, stress runner, or normal benchmark.
+External baselines are discovered or fetched only when their disabled-by-default
+benchmark flags are enabled. Missing Boost headers disable only Boost scenarios.
+moodycamel, rigtorp, and atomic_queue are pinned header-only FetchContent
+baselines used only by the benchmark target. None of these optional paths affect
+the core library, tests, installation, stress runner, or normal benchmark.

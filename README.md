@@ -134,27 +134,75 @@ protocols under the C/C++ weak-memory model; benchmark validation rejects
 corrupt or inconsistent measured work. None is an unbounded refinement proof of
 the complete C++ implementation.
 
-## Design Evidence
+## Benchmarking by Delivery Semantics
 
-### Multicast index exploration
+Benchmarks are grouped by delivery semantics before throughput is compared.
+SPSC queues are compared only against SPSC baselines. MPMC queues are compared
+only against exclusive-pop MPMC baselines. SPMC multicast is reported
+separately because aggregate consumer observations are not directly comparable
+to exclusive-pop throughput.
 
-![Global-index multicast ring exploration](docs/assets/spmc_global_indices.png)
+### SPSC: exclusive handoff
 
-The blue ring captures the index-contention question behind the multicast
-research: consumers can advance independently while a producer publishes into
-bounded storage. It is design evidence, not the current synchronization
-protocol. `SPMCMulticastQueue` owns consumer cursors and uses a mutex across
-publication and payload copy to prevent writer/reader data races.
+Implemented or planned baselines:
 
-### Benchmark semantics example
+| Baseline | Status |
+| --- | --- |
+| Line64 `SPSCQueue` | Implemented |
+| `boost::lockfree::spsc_queue` | Optional, disabled by default |
+| `rigtorp/SPSCQueue` | Optional, disabled by default |
+| `folly::ProducerConsumerQueue` | Future work only |
 
-![Non-comparable benchmark semantics example](docs/assets/benchmark_semantics_example.png)
+Metric:
 
-The red chart demonstrates why a throughput total needs a delivery contract.
-Its SPMC bars count multicast observations while the baselines count exclusive
-pops, so the bars are not equivalent work and are not a current performance
-claim. The maintained benchmark emits separate publication, aggregate-read,
-unique-sequence, retry, and validation fields.
+- messages/sec;
+- bytes/sec;
+- failed push/pop attempts;
+- checksum validation.
+
+### MPMC: exclusive-pop work-sharing
+
+Implemented or planned baselines:
+
+| Baseline | Status |
+| --- | --- |
+| Line64 `MPMCQueue` | Implemented |
+| Line64 `BlockingQueue` | Implemented |
+| `boost::lockfree::queue` | Optional, disabled by default |
+| `moodycamel::ConcurrentQueue` | Optional, disabled by default |
+| `max0x7ba/atomic_queue` | Optional, disabled by default |
+
+Metric:
+
+- messages/sec;
+- bytes/sec;
+- producer failed tries;
+- consumer failed tries;
+- checksum validation.
+
+### SPMC: multicast retained history
+
+Reported separately:
+
+| Baseline | Status |
+| --- | --- |
+| Line64 `SPMCMulticastQueue` | Implemented |
+
+Metric:
+
+- published messages/sec;
+- aggregate consumer observations/sec;
+- per-consumer observations/sec;
+- `consumer_lagged` count;
+- retained history / overwrite behavior.
+
+SPMC multicast results are not directly comparable to exclusive-pop MPMC or
+SPSC throughput.
+
+The benchmark executable emits machine-readable JSON with
+`benchmark_group`, `delivery_semantics`, retry counters, validation counters,
+per-consumer read/rate arrays, and provenance fields so downstream scripts can
+compare only compatible delivery models.
 
 ## Quick Start
 
@@ -183,8 +231,9 @@ cmake --build build-release --parallel
 ```
 
 The core library has no mandatory third-party dependency. Tests, benchmarks,
-and stress support are enabled by default; optional Boost benchmark scenarios
-remain disabled unless `ORBITQUEUE_ENABLE_BOOST_BENCHMARKS=ON` is requested.
+and stress support are enabled by default. Optional external benchmark
+baselines remain disabled unless their `LINE64_ENABLE_*` or compatible
+`ORBITQUEUE_ENABLE_*` CMake flags are requested.
 
 ## SPSC Usage
 

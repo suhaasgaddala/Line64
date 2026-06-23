@@ -6,15 +6,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <cstring>
 #include <ctime>
 #include <exception>
 #include <iomanip>
+#include <initializer_list>
 #include <iostream>
 #include <iterator>
 #include <limits>
-#include <random>
-#include <span>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -23,15 +22,28 @@
 #include <utility>
 #include <vector>
 
-#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE)
-#include <boost/lockfree/queue.hpp>
-#endif
-
 #include "benchmark_support.h"
-#include "orbitqueue/blocking_queue.h"
-#include "orbitqueue/mpmc_queue.h"
+#include "external_baselines/benchmark_message.h"
+#include "external_baselines/blocking_queue_adapter.h"
+#include "external_baselines/line64_mpmc_adapter.h"
+#include "external_baselines/line64_spsc_adapter.h"
 #include "orbitqueue/spmc_multicast_queue.h"
-#include "orbitqueue/spsc_queue.h"
+
+#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE_QUEUE)
+#include "external_baselines/boost_lockfree_mpmc_adapter.h"
+#endif
+#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE_SPSC)
+#include "external_baselines/boost_lockfree_spsc_adapter.h"
+#endif
+#if defined(ORBITQUEUE_HAVE_MOODYCAMEL_CONCURRENTQUEUE)
+#include "external_baselines/moodycamel_mpmc_adapter.h"
+#endif
+#if defined(ORBITQUEUE_HAVE_ATOMIC_QUEUE)
+#include "external_baselines/atomic_queue_mpmc_adapter.h"
+#endif
+#if defined(ORBITQUEUE_HAVE_RIGTORP_SPSCQUEUE)
+#include "external_baselines/rigtorp_spsc_adapter.h"
+#endif
 
 #if !defined(ORBITQUEUE_BENCHMARK_BUILD_TYPE)
 #define ORBITQUEUE_BENCHMARK_BUILD_TYPE "unknown"
@@ -47,11 +59,16 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 using orbitqueue::QueueStatus;
+using orbitqueue::benchmark::make_payload;
+using orbitqueue::benchmark::Payload;
+using orbitqueue::benchmark::read_header;
+using orbitqueue::benchmark::readable;
 using orbitqueue::benchmark::Result;
 using orbitqueue::benchmark::SequenceTracker;
-
-constexpr std::size_t max_payload_size = 256;
-constexpr std::size_t payload_header_size = 32;
+using orbitqueue::benchmark::valid_payload;
+using orbitqueue::benchmark::writable;
+using orbitqueue::benchmark::max_payload_size;
+using orbitqueue::benchmark::payload_header_size;
 
 struct Config {
     std::uint64_t duration_ms{250};
@@ -69,32 +86,23 @@ struct Config {
     bool custom_consumers{};
 };
 
-struct PayloadHeader {
-    std::uint64_t global_id{};
-    std::uint64_t local_sequence{};
-    std::uint32_t producer_id{};
-    std::uint32_t payload_size{};
-    std::uint64_t checksum{};
-};
-
-static_assert(sizeof(PayloadHeader) == payload_header_size);
-
-struct Payload {
-    std::array<std::byte, max_payload_size> bytes{};
-    std::uint32_t size{};
-};
-
 enum class ScenarioKind {
-    spsc,
-    blocking,
+    line64_spsc,
+    boost_spsc,
+    rigtorp_spsc,
+    line64_blocking,
     spmc,
-    mpmc,
-    boost
+    line64_mpmc,
+    boost_mpmc,
+    moodycamel_mpmc,
+    atomic_queue_mpmc
 };
 
 struct Scenario {
     ScenarioKind kind{};
     std::string name;
+    std::string benchmark_group;
+    std::string delivery_semantics;
     std::size_t producers{};
     std::size_t consumers{};
     std::string notes;
@@ -116,69 +124,6 @@ struct Metadata {
     std::string git_commit;
     std::string timestamp;
 };
-
-[[nodiscard]] std::uint64_t mix(const PayloadHeader& header) noexcept {
-    auto value = header.global_id ^
-                 (static_cast<std::uint64_t>(header.producer_id) << 32U) ^
-                 header.local_sequence ^ 0x4f52424954515545ULL;
-    value ^= value >> 30U;
-    value *= 0xbf58476d1ce4e5b9ULL;
-    value ^= value >> 27U;
-    value *= 0x94d049bb133111ebULL;
-    return value ^ (value >> 31U);
-}
-
-[[nodiscard]] Payload make_payload(
-    const std::uint32_t payload_size,
-    const std::uint32_t producer_id,
-    const std::uint64_t local_sequence,
-    const std::uint64_t global_id) {
-    Payload payload;
-    payload.size = payload_size;
-    PayloadHeader header{
-        global_id, local_sequence, producer_id, payload_size, 0};
-    header.checksum = mix(header);
-    std::memcpy(payload.bytes.data(), &header, sizeof(header));
-    std::mt19937_64 random(header.checksum);
-    for (std::size_t index = sizeof(header); index < payload.size; ++index) {
-        payload.bytes[index] = static_cast<std::byte>(random() & 0xffU);
-    }
-    return payload;
-}
-
-[[nodiscard]] std::span<const std::byte> readable(const Payload& payload) noexcept {
-    return {payload.bytes.data(), payload.size};
-}
-
-[[nodiscard]] std::span<std::byte> writable(Payload& payload) noexcept {
-    return {payload.bytes.data(), payload.size};
-}
-
-[[nodiscard]] PayloadHeader read_header(const Payload& payload) noexcept {
-    PayloadHeader header;
-    if (payload.size >= sizeof(header)) {
-        std::memcpy(&header, payload.bytes.data(), sizeof(header));
-    }
-    return header;
-}
-
-[[nodiscard]] bool valid_payload(
-    const Payload& payload,
-    const std::uint32_t expected_size) {
-    if (payload.size != expected_size || payload.size < sizeof(PayloadHeader)) {
-        return false;
-    }
-    const auto header = read_header(payload);
-    if (header.payload_size != payload.size || header.global_id == 0 ||
-        header.local_sequence == 0 || header.checksum != mix(header)) {
-        return false;
-    }
-    const auto expected = make_payload(
-        payload.size, header.producer_id, header.local_sequence, header.global_id);
-    return std::equal(
-        readable(payload).begin(), readable(payload).end(),
-        readable(expected).begin(), readable(expected).end());
-}
 
 void record_payload(
     ConsumerMetrics& metrics,
@@ -253,7 +198,8 @@ void print_usage(std::ostream& output) {
         << "  --payload-size <uint32>\n"
         << "  --producers <uint32>\n"
         << "  --consumers <default|single|comma-separated counts>\n"
-        << "  --queue <all|spsc|blocking|spmc|mpmc|boost>\n"
+        << "  --queue <all|spsc|blocking|spmc|mpmc|boost|boost_spsc|"
+           "boost_mpmc|moodycamel_mpmc|rigtorp_spsc|atomic_queue_mpmc>\n"
         << "  --help\n";
 }
 
@@ -308,8 +254,10 @@ void print_usage(std::ostream& output) {
         }
     }
 
-    const std::array<std::string_view, 6> queues{
-        "all", "spsc", "blocking", "spmc", "mpmc", "boost"};
+    const std::array<std::string_view, 11> queues{
+        "all", "spsc", "blocking", "spmc", "mpmc", "boost",
+        "boost_spsc", "boost_mpmc", "moodycamel_mpmc",
+        "rigtorp_spsc", "atomic_queue_mpmc"};
     if (std::find(queues.begin(), queues.end(), config.queue) == queues.end()) {
         throw std::invalid_argument("invalid --queue value");
     }
@@ -328,7 +276,10 @@ void print_usage(std::ostream& output) {
     if (config.capacity == 0 || config.capacity > 1'000'000) {
         throw std::invalid_argument("--capacity must be between 1 and 1000000");
     }
-    if ((config.queue == "all" || config.queue == "mpmc") &&
+    if ((config.queue == "all" || config.queue == "mpmc" ||
+         config.queue == "boost" || config.queue == "boost_mpmc" ||
+         config.queue == "moodycamel_mpmc" ||
+         config.queue == "atomic_queue_mpmc") &&
         (config.capacity < 2 ||
          (config.capacity & (config.capacity - 1)) != 0)) {
         throw std::invalid_argument(
@@ -349,56 +300,121 @@ void print_usage(std::ostream& output) {
     const auto selected = [&](const std::string_view name) {
         return config.queue == "all" || config.queue == name;
     };
-    if (selected("spsc")) {
-        scenarios.push_back({ScenarioKind::spsc, "spsc", 1, 1,
-            "work-sharing; exactly one producer and one consumer"});
-    }
-    if (selected("spmc")) {
-        for (const auto consumers : config.consumers) {
-            scenarios.push_back({ScenarioKind::spmc, "spmc_multicast", 1, consumers,
-                "multicast aggregate reads are not work-sharing pops"});
-        }
-    }
-    if (selected("blocking")) {
-        for (const auto consumers : config.consumers) {
-            scenarios.push_back({ScenarioKind::blocking, "blocking_mpmc",
-                config.producers, consumers,
-                "blocking mutex baseline; exclusive work sharing"});
-        }
-    }
-    if (selected("mpmc")) {
-        if (!config.custom_producers &&
-            !config.custom_consumers) {
-            constexpr std::array<std::pair<std::size_t, std::size_t>, 3> matrix{
-                std::pair<std::size_t, std::size_t>{1, 1},
-                std::pair<std::size_t, std::size_t>{4, 4},
-                std::pair<std::size_t, std::size_t>{4, 10}};
-            for (const auto [producers, consumers] : matrix) {
-                scenarios.push_back({ScenarioKind::mpmc, "mpmc",
-                    producers, consumers,
-                    "mutex-free bounded sequence-cell MPMC; exclusive work sharing"});
+    const auto selected_any = [&](const std::initializer_list<std::string_view> names) {
+        return std::any_of(names.begin(), names.end(), selected);
+    };
+    constexpr std::array<std::pair<std::size_t, std::size_t>, 4> mpmc_matrix{
+        std::pair<std::size_t, std::size_t>{1, 1},
+        std::pair<std::size_t, std::size_t>{2, 2},
+        std::pair<std::size_t, std::size_t>{4, 4},
+        std::pair<std::size_t, std::size_t>{8, 8}};
+    const auto add_mpmc_scenarios = [&](
+        const ScenarioKind kind,
+        std::string name,
+        std::string notes) {
+        if (!config.custom_producers && !config.custom_consumers) {
+            for (const auto [producers, consumers] : mpmc_matrix) {
+                scenarios.push_back({kind, name, "mpmc_work_sharing",
+                    "exclusive_pop", producers, consumers, notes});
             }
         } else {
             for (const auto consumers : config.consumers) {
-                scenarios.push_back({ScenarioKind::mpmc, "mpmc",
-                    config.producers, consumers,
-                    "mutex-free bounded sequence-cell MPMC; exclusive work sharing"});
+                scenarios.push_back({kind, name, "mpmc_work_sharing",
+                    "exclusive_pop", config.producers, consumers, notes});
             }
         }
+    };
+
+    if (selected("spsc")) {
+        scenarios.push_back({ScenarioKind::line64_spsc, "Line64::SPSCQueue",
+            "spsc_exclusive_handoff", "exclusive_handoff", 1, 1,
+            "Line64 SPSC exclusive handoff"});
     }
-    if (selected("boost")) {
-#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE)
-        for (const auto consumers : config.consumers) {
-            scenarios.push_back({ScenarioKind::boost,
-                "boost_lockfree_work_sharing", 1, consumers,
-                "optional Boost work-sharing baseline; lock-free status is platform-dependent"});
-        }
+    if (selected_any({"boost", "boost_spsc"})) {
+#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE_SPSC)
+        scenarios.push_back({ScenarioKind::boost_spsc,
+            "boost::lockfree::spsc_queue", "spsc_exclusive_handoff",
+            "exclusive_handoff", 1, 1,
+            "optional Boost SPSC exclusive handoff baseline"});
 #else
-        if (config.queue == "boost") {
+        if (config.queue == "boost_spsc") {
+            throw std::invalid_argument(
+                "Boost SPSC benchmark requested but boost/lockfree/spsc_queue.hpp was unavailable at build time");
+        }
+#endif
+    }
+    if (selected("rigtorp_spsc")) {
+#if defined(ORBITQUEUE_HAVE_RIGTORP_SPSCQUEUE)
+        scenarios.push_back({ScenarioKind::rigtorp_spsc,
+            "rigtorp::SPSCQueue", "spsc_exclusive_handoff",
+            "exclusive_handoff", 1, 1,
+            "optional rigtorp SPSC exclusive handoff baseline"});
+#else
+        if (config.queue == "rigtorp_spsc") {
+            throw std::invalid_argument(
+                "rigtorp SPSC benchmark requested but rigtorp/SPSCQueue.h was unavailable at build time");
+        }
+#endif
+    }
+    if (selected("spmc")) {
+        for (const auto consumers : config.consumers) {
+            scenarios.push_back({ScenarioKind::spmc,
+                "Line64::SPMCMulticastQueue",
+                "spmc_multicast_retained_history",
+                "multicast_retained_history", 1, consumers,
+                "SPMC multicast aggregate observations are reported separately"});
+        }
+    }
+    if (selected("blocking")) {
+        add_mpmc_scenarios(ScenarioKind::line64_blocking,
+            "Line64::BlockingQueue",
+            "Line64 blocking MPMC exclusive-pop work-sharing baseline");
+    }
+    if (selected("mpmc")) {
+        add_mpmc_scenarios(ScenarioKind::line64_mpmc,
+            "Line64::MPMCQueue",
+            "Line64 mutex-free bounded sequence-cell MPMC");
+    }
+    if (selected_any({"boost", "boost_mpmc"})) {
+#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE_QUEUE)
+        add_mpmc_scenarios(ScenarioKind::boost_mpmc,
+            "boost::lockfree::queue",
+            "optional Boost.Lockfree exclusive-pop MPMC baseline");
+#else
+        if (config.queue == "boost_mpmc") {
             throw std::invalid_argument(
                 "Boost benchmark requested but boost/lockfree/queue.hpp was unavailable at build time");
         }
 #endif
+    }
+    if (selected("moodycamel_mpmc")) {
+#if defined(ORBITQUEUE_HAVE_MOODYCAMEL_CONCURRENTQUEUE)
+        add_mpmc_scenarios(ScenarioKind::moodycamel_mpmc,
+            "moodycamel::ConcurrentQueue",
+            "optional moodycamel exclusive-pop MPMC baseline");
+#else
+        if (config.queue == "moodycamel_mpmc") {
+            throw std::invalid_argument(
+                "moodycamel benchmark requested but concurrentqueue.h was unavailable at build time");
+        }
+#endif
+    }
+    if (selected("atomic_queue_mpmc")) {
+#if defined(ORBITQUEUE_HAVE_ATOMIC_QUEUE)
+        add_mpmc_scenarios(ScenarioKind::atomic_queue_mpmc,
+            "atomic_queue::AtomicQueueB2",
+            "optional atomic_queue exclusive-pop MPMC baseline");
+#else
+        if (config.queue == "atomic_queue_mpmc") {
+            throw std::invalid_argument(
+                "atomic_queue benchmark requested but atomic_queue/atomic_queue.h was unavailable at build time");
+        }
+#endif
+    }
+    if (scenarios.empty()) {
+        throw std::invalid_argument(
+            "no benchmark scenarios were selected or compiled for --queue " +
+            config.queue);
     }
     return scenarios;
 }
@@ -415,29 +431,36 @@ void print_usage(std::ostream& output) {
     return output.str();
 }
 
-[[nodiscard]] std::uint64_t count_unique_ids(
-    const std::vector<ConsumerMetrics>& metrics,
-    std::uint64_t& duplicate_count,
-    std::uint64_t& minimum,
-    std::uint64_t& maximum) {
+[[nodiscard]] std::vector<std::uint64_t> collect_payload_ids(
+    const std::vector<ConsumerMetrics>& metrics) {
     std::vector<std::uint64_t> ids;
     for (const auto& metric : metrics) {
         ids.insert(ids.end(), metric.payload_ids.begin(), metric.payload_ids.end());
     }
+    return ids;
+}
+
+[[nodiscard]] std::uint64_t count_unique_ids(
+    std::vector<std::uint64_t> ids,
+    std::uint64_t& duplicate_count) {
     if (ids.empty()) {
         duplicate_count = 0;
-        minimum = 0;
-        maximum = 0;
         return 0;
     }
     std::sort(ids.begin(), ids.end());
-    minimum = ids.front();
-    maximum = ids.back();
     const auto unique_end = std::unique(ids.begin(), ids.end());
     const auto unique = static_cast<std::uint64_t>(
         std::distance(ids.begin(), unique_end));
     duplicate_count = static_cast<std::uint64_t>(ids.size()) - unique;
     return unique;
+}
+
+[[nodiscard]] bool has_same_ids(
+    std::vector<std::uint64_t> observed,
+    std::vector<std::uint64_t> expected) {
+    std::sort(observed.begin(), observed.end());
+    std::sort(expected.begin(), expected.end());
+    return observed == expected;
 }
 
 [[nodiscard]] Result make_result(
@@ -446,12 +469,15 @@ void print_usage(std::ostream& output) {
     const Metadata& metadata,
     const std::uint32_t trial,
     const std::uint64_t published,
+    const std::vector<std::uint64_t>& published_ids,
     const std::vector<ConsumerMetrics>& metrics,
     const std::uint64_t full_retries,
     const std::uint64_t producer_errors,
     const bool require_complete_work_sharing) {
     Result result;
+    result.benchmark_group = scenario.benchmark_group;
     result.queue = scenario.name;
+    result.delivery_semantics = scenario.delivery_semantics;
     result.trial = trial;
     result.capacity = config.capacity;
     result.payload_size = config.payload_size;
@@ -466,6 +492,7 @@ void print_usage(std::ostream& output) {
     result.git_commit = metadata.git_commit;
     result.timestamp = metadata.timestamp;
     result.notes = scenario.notes;
+    result.consumer_reads.reserve(metrics.size());
 
     for (const auto& metric : metrics) {
         result.aggregate_reads += metric.reads;
@@ -473,19 +500,20 @@ void print_usage(std::ostream& output) {
         result.empty_retries += metric.empty_retries;
         result.invalid_payloads += metric.invalid_payloads;
         result.validation_errors += metric.validation_errors;
+        result.consumer_reads.push_back(metric.reads);
     }
     result.validation_errors += producer_errors;
 
     std::uint64_t duplicates = 0;
-    std::uint64_t minimum = 0;
-    std::uint64_t maximum = 0;
+    auto observed_ids = collect_payload_ids(metrics);
     result.unique_sequences_verified = count_unique_ids(
-        metrics, duplicates, minimum, maximum);
+        observed_ids, duplicates);
     if (require_complete_work_sharing) {
         result.validation_errors += duplicates;
         if (result.aggregate_reads != published ||
             result.unique_sequences_verified != published ||
-            (published != 0 && (minimum != 1 || maximum != published))) {
+            published_ids.size() != published ||
+            !has_same_ids(std::move(observed_ids), published_ids)) {
             ++result.validation_errors;
         }
     }
@@ -495,31 +523,46 @@ void print_usage(std::ostream& output) {
         static_cast<double>(published) / seconds;
     result.throughput_reads_per_second =
         static_cast<double>(result.aggregate_reads) / seconds;
+    result.throughput_bytes_per_second =
+        static_cast<double>(result.aggregate_reads * config.payload_size) / seconds;
+    result.consumer_reads_per_second.reserve(result.consumer_reads.size());
+    for (const auto reads : result.consumer_reads) {
+        result.consumer_reads_per_second.push_back(static_cast<double>(reads) / seconds);
+    }
     return result;
 }
 
-[[nodiscard]] Result run_spsc(
+template <typename Adapter>
+[[nodiscard]] Result run_spsc_adapter(
     const Scenario& scenario,
     const Config& config,
     const Metadata& metadata,
     const std::uint32_t trial,
     const std::chrono::milliseconds duration) {
-    orbitqueue::SPSCQueue<max_payload_size> queue(config.capacity);
+    Adapter queue(config.capacity);
     std::atomic<bool> running{true};
+    std::atomic<bool> producer_done{false};
     std::uint64_t published = 0;
     std::uint64_t full_retries = 0;
     std::uint64_t producer_errors = 0;
+    std::vector<std::uint64_t> published_ids;
     ConsumerMetrics metrics;
 
     std::thread producer([&] {
         std::uint64_t id = 1;
         while (running.load(std::memory_order_relaxed)) {
             const auto payload = make_payload(config.payload_size, 0, id, id);
-            const auto result = queue.try_push(readable(payload));
+            const auto result = queue.try_push(payload);
             if (result.status == QueueStatus::success) {
-                if (result.sequence != id) {
+                if constexpr (Adapter::has_queue_sequences) {
+                    if (result.sequence != id) {
+                        ++producer_errors;
+                    }
+                }
+                if (!Adapter::has_queue_sequences && result.sequence != 0) {
                     ++producer_errors;
                 }
+                published_ids.push_back(id);
                 published = id++;
             } else if (result.status == QueueStatus::full) {
                 ++full_retries;
@@ -529,15 +572,21 @@ void print_usage(std::ostream& output) {
                 break;
             }
         }
+        producer_done.store(true, std::memory_order_release);
     });
     std::thread consumer([&] {
-        while (running.load(std::memory_order_relaxed) || !queue.empty()) {
+        while (true) {
             Payload payload;
             payload.size = config.payload_size;
-            const auto result = queue.try_pop(writable(payload));
+            const auto result = queue.try_pop(payload);
             if (result.status == QueueStatus::success) {
-                record_payload(metrics, payload, config.payload_size, result.sequence);
+                record_payload(
+                    metrics, payload, config.payload_size,
+                    Adapter::has_queue_sequences ? result.sequence : 0);
             } else if (result.status == QueueStatus::empty) {
+                if (producer_done.load(std::memory_order_acquire)) {
+                    break;
+                }
                 ++metrics.empty_retries;
                 std::this_thread::yield();
             } else {
@@ -552,7 +601,8 @@ void print_usage(std::ostream& output) {
     producer.join();
     consumer.join();
     return make_result(scenario, config, metadata, trial, published,
-                       {std::move(metrics)}, full_retries, producer_errors, true);
+                       published_ids, {std::move(metrics)}, full_retries,
+                       producer_errors, true);
 }
 
 [[nodiscard]] Result run_spmc(
@@ -613,7 +663,7 @@ void print_usage(std::ostream& output) {
         consumer.join();
     }
     return make_result(scenario, config, metadata, trial,
-                       queue.published_sequence(), metrics,
+                       queue.published_sequence(), {}, metrics,
                        0, producer_errors, false);
 }
 
@@ -634,6 +684,8 @@ template <typename Push, typename Pop, typename Close>
     std::atomic<std::uint64_t> full_retries{0};
     std::atomic<std::uint64_t> producer_errors{0};
     std::atomic<std::size_t> remaining{scenario.producers};
+    std::mutex published_ids_mutex;
+    std::vector<std::uint64_t> published_ids;
     std::vector<ConsumerMetrics> metrics(scenario.consumers);
 
     std::vector<std::thread> consumers;
@@ -671,6 +723,10 @@ template <typename Push, typename Pop, typename Close>
                 while (true) {
                     const auto result = push(payload);
                     if (result.status == QueueStatus::success) {
+                        {
+                            std::lock_guard<std::mutex> lock(published_ids_mutex);
+                            published_ids.push_back(id);
+                        }
                         published.fetch_add(1, std::memory_order_relaxed);
                         break;
                     }
@@ -679,6 +735,9 @@ template <typename Push, typename Pop, typename Close>
                         break;
                     }
                     full_retries.fetch_add(1, std::memory_order_relaxed);
+                    if (!running.load(std::memory_order_relaxed)) {
+                        break;
+                    }
                     std::this_thread::yield();
                 }
             }
@@ -698,90 +757,41 @@ template <typename Push, typename Pop, typename Close>
     }
     return make_result(
         scenario, config, metadata, trial,
-        published.load(std::memory_order_relaxed), metrics,
+        published.load(std::memory_order_relaxed), published_ids, metrics,
         full_retries.load(std::memory_order_relaxed),
         producer_errors.load(std::memory_order_relaxed), true);
 }
 
-[[nodiscard]] Result run_blocking(
+template <typename Adapter>
+[[nodiscard]] Result run_exclusive_pop_adapter(
     const Scenario& scenario,
     const Config& config,
     const Metadata& metadata,
     const std::uint32_t trial,
     const std::chrono::milliseconds duration) {
-    orbitqueue::BlockingQueue<Payload> queue(config.capacity);
-    const auto push = [&](const Payload& payload) {
-        return orbitqueue::WriteResult{queue.try_push(payload), 0};
-    };
-    const auto pop = [&](Payload& payload) {
-        const auto value = queue.pop();
-        if (!value) {
-            return orbitqueue::ReadResult{QueueStatus::closed, 0, 0};
-        }
-        payload = *value;
-        return orbitqueue::ReadResult{QueueStatus::success, payload.size, 0};
-    };
-    return run_work_sharing(
-        push, pop, [&] { queue.close(); }, scenario, config,
-        metadata, trial, duration, false);
-}
-
-[[nodiscard]] Result run_mpmc(
-    const Scenario& scenario,
-    const Config& config,
-    const Metadata& metadata,
-    const std::uint32_t trial,
-    const std::chrono::milliseconds duration) {
-    orbitqueue::MPMCQueue<max_payload_size> queue(config.capacity);
+    Adapter queue(config.capacity);
     std::atomic<bool> producers_done{false};
     const auto push = [&](const Payload& payload) {
-        return queue.try_push(readable(payload));
+        return queue.try_push(payload);
     };
     const auto pop = [&](Payload& payload) {
-        const auto result = queue.try_pop(writable(payload));
+        const auto result = queue.try_pop(payload);
         if (result.status == QueueStatus::empty &&
             producers_done.load(std::memory_order_acquire)) {
             return orbitqueue::ReadResult{QueueStatus::closed, 0, 0};
         }
         return result;
     };
-    return run_work_sharing(
-        push, pop,
-        [&] { producers_done.store(true, std::memory_order_release); },
-        scenario, config,
-        metadata, trial, duration, true);
-}
-
-#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE)
-[[nodiscard]] Result run_boost(
-    const Scenario& scenario,
-    const Config& config,
-    const Metadata& metadata,
-    const std::uint32_t trial,
-    const std::chrono::milliseconds duration) {
-    boost::lockfree::queue<Payload, boost::lockfree::fixed_sized<true>> queue(
-        config.capacity);
-    std::atomic<bool> producer_done{false};
-    const auto push = [&](const Payload& payload) {
-        return orbitqueue::WriteResult{
-            queue.push(payload) ? QueueStatus::success : QueueStatus::full, 0};
-    };
-    const auto pop = [&](Payload& payload) {
-        if (queue.pop(payload)) {
-            return orbitqueue::ReadResult{QueueStatus::success, payload.size, 0};
+    const auto close = [&] {
+        producers_done.store(true, std::memory_order_release);
+        if constexpr (requires(Adapter& adapter) { adapter.close(); }) {
+            queue.close();
         }
-        return orbitqueue::ReadResult{
-            producer_done.load(std::memory_order_acquire)
-                ? QueueStatus::closed
-                : QueueStatus::empty,
-            0, 0};
     };
-    const auto close = [&] { producer_done.store(true, std::memory_order_release); };
     return run_work_sharing(
-        push, pop, close, scenario, config,
-        metadata, trial, duration, false);
+        push, pop, close, scenario, config, metadata, trial, duration,
+        Adapter::has_queue_sequences);
 }
-#endif
 
 [[nodiscard]] Result run_scenario(
     const Scenario& scenario,
@@ -790,19 +800,56 @@ template <typename Push, typename Pop, typename Close>
     const std::uint32_t trial,
     const std::chrono::milliseconds duration) {
     switch (scenario.kind) {
-    case ScenarioKind::spsc:
-        return run_spsc(scenario, config, metadata, trial, duration);
-    case ScenarioKind::blocking:
-        return run_blocking(scenario, config, metadata, trial, duration);
+    case ScenarioKind::line64_spsc:
+        return run_spsc_adapter<orbitqueue::benchmark::Line64SPSCAdapter>(
+            scenario, config, metadata, trial, duration);
+    case ScenarioKind::boost_spsc:
+#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE_SPSC)
+        return run_spsc_adapter<orbitqueue::benchmark::BoostLockfreeSPSCAdapter>(
+            scenario, config, metadata, trial, duration);
+#else
+        throw std::logic_error("Boost SPSC scenario was not compiled");
+#endif
+    case ScenarioKind::rigtorp_spsc:
+#if defined(ORBITQUEUE_HAVE_RIGTORP_SPSCQUEUE)
+        return run_spsc_adapter<orbitqueue::benchmark::RigtorpSPSCAdapter>(
+            scenario, config, metadata, trial, duration);
+#else
+        throw std::logic_error("rigtorp SPSC scenario was not compiled");
+#endif
+    case ScenarioKind::line64_blocking:
+        return run_exclusive_pop_adapter<
+            orbitqueue::benchmark::Line64BlockingQueueAdapter>(
+            scenario, config, metadata, trial, duration);
     case ScenarioKind::spmc:
         return run_spmc(scenario, config, metadata, trial, duration);
-    case ScenarioKind::mpmc:
-        return run_mpmc(scenario, config, metadata, trial, duration);
-    case ScenarioKind::boost:
-#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE)
-        return run_boost(scenario, config, metadata, trial, duration);
+    case ScenarioKind::line64_mpmc:
+        return run_exclusive_pop_adapter<
+            orbitqueue::benchmark::Line64MPMCAdapter>(
+            scenario, config, metadata, trial, duration);
+    case ScenarioKind::boost_mpmc:
+#if defined(ORBITQUEUE_HAVE_BOOST_LOCKFREE_QUEUE)
+        return run_exclusive_pop_adapter<
+            orbitqueue::benchmark::BoostLockfreeMPMCAdapter>(
+            scenario, config, metadata, trial, duration);
 #else
-        throw std::logic_error("Boost scenario was not compiled");
+        throw std::logic_error("Boost MPMC scenario was not compiled");
+#endif
+    case ScenarioKind::moodycamel_mpmc:
+#if defined(ORBITQUEUE_HAVE_MOODYCAMEL_CONCURRENTQUEUE)
+        return run_exclusive_pop_adapter<
+            orbitqueue::benchmark::MoodycamelMPMCAdapter>(
+            scenario, config, metadata, trial, duration);
+#else
+        throw std::logic_error("moodycamel MPMC scenario was not compiled");
+#endif
+    case ScenarioKind::atomic_queue_mpmc:
+#if defined(ORBITQUEUE_HAVE_ATOMIC_QUEUE)
+        return run_exclusive_pop_adapter<
+            orbitqueue::benchmark::AtomicQueueMPMCAdapter>(
+            scenario, config, metadata, trial, duration);
+#else
+        throw std::logic_error("atomic_queue MPMC scenario was not compiled");
 #endif
     }
     throw std::logic_error("unknown benchmark scenario");
