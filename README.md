@@ -217,12 +217,42 @@ baselines. MPMC queues are compared only against exclusive-pop work-sharing
 baselines. SPMC multicast is reported separately because aggregate consumer
 observations are not directly comparable to exclusive-pop throughput.
 
-### MPMC performance tests: exclusive-pop work sharing
+**Performance highlights.** Because the suite stays grouped by queue semantics
+instead of mixing incompatible workloads, every number below is defensible. The
+headline results are the atomic-versioned SPMC path reaching up to `4.76x`
+higher published throughput than the conservative multicast implementation, and
+the mutex-free MPMC queue ranking first in the displayed selected-topology
+external-baseline snapshot.
 
-Line64's MPMC queue is compared only against exclusive-pop work-sharing queues.
-In the local Apple M4 performance-test run at capacity `32,768` with `64 B`
-payloads, Line64 `MPMCQueue` ranked first in the tested `1P/1C` and `2P/2C`
-scenarios against the measured baselines shown below.
+### SPMC performance tests: atomic-versioned multicast
+
+`VersionedSPMCQueue` is Line64's atomic-versioned, mutex-free SPMC path. It uses
+per-cell versioning to avoid the centralized publication bottlenecks of the
+conservative multicast queue while preserving multicast retained-history
+semantics.
+
+In the post-PR #9 performance snapshot, `VersionedSPMCQueue` outperformed the
+conservative `SPMCMulticastQueue` across every tested multicast topology,
+reaching up to `4.76x` higher published throughput at `1P/10C`.
+
+![Line64 SPMC performance test results](assets/line64_spmc_versioned_vs_conservative.png)
+
+| Topology | `VersionedSPMCQueue` | `SPMCMulticastQueue` | Speedup |
+|---|---:|---:|---:|
+| `1P/1C` | 1,966,210 msg/s | 1,726,377 msg/s | `1.14x` |
+| `1P/3C` | 1,882,912 msg/s | 1,549,005 msg/s | `1.22x` |
+| `1P/10C` | 1,186,448 msg/s | 249,124 msg/s | `4.76x` |
+
+SPMC multicast results are reported separately from SPSC and MPMC throughput
+because a single published message may be observed by multiple consumers.
+
+### MPMC performance tests: selected external-baseline snapshot
+
+Line64's mutex-free `MPMCQueue` is evaluated against external exclusive-pop MPMC
+baselines. In the selected MPMC snapshot shown below, `MPMCQueue` ranked first
+in the displayed low-contention topologies against the measured baselines,
+including Boost.Lockfree, moodycamel, atomic_queue, and the internal
+mutex-backed baseline.
 
 ![Line64 MPMC performance test results](assets/line64_mpmc_selected_topologies.png)
 
@@ -245,22 +275,13 @@ build, capacity `32,768`, payload `64 B`, `1s` measured per scenario after
 
 ### SPSC performance tests: exclusive handoff
 
-Line64 `SPSCQueue` is benchmarked only against SPSC exclusive-handoff baselines.
-In local Apple M4 testing, Line64 remained competitive with `rigtorp/SPSCQueue`
-and `boost::lockfree::spsc_queue` while preserving the project's fixed-payload
-API, explicit status results, cache-layout isolation, and documentation-focused
-design.
+`SPSCQueue` is Line64's lock-free single-producer/single-consumer path. It
+remains competitive with standard SPSC baselines such as `rigtorp/SPSCQueue` and
+`boost::lockfree::spsc_queue` while keeping Line64's fixed-payload API, explicit
+status results, and cache-layout isolation.
 
-### SPMC performance tests: multicast retained history
-
-Line64 `SPMCMulticastQueue` is reported separately. A single published message
-may be observed by multiple consumers, so aggregate consumer observations can
-exceed published message throughput. These results are useful for understanding
-multicast retained-history behavior, but they are not directly comparable to
-SPSC or MPMC exclusive-pop throughput.
-
-The benchmark executable emits JSONL so charts can be regenerated from measured
-output instead of hand-written numbers.
+The benchmark executable emits JSONL so every chart and table above can be
+regenerated from measured output instead of hand-written numbers.
 
 ## Quick Start
 
