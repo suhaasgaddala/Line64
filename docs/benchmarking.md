@@ -140,10 +140,24 @@ affinity, background load, allocator behavior, and compiler flags can all affect
 results. The metadata is provenance, not full environment capture, and the
 harness does not report latency distributions or statistical significance.
 
+## Delivery semantics comparison
+
+![Benchmark delivery semantics comparison](assets/delivery_semantics_comparison.svg)
+
+This diagram makes the benchmark accounting rule explicit. Work-sharing queues
+count exclusive pops, while multicast SPMC counts aggregate consumer
+observations of retained messages. Those totals are different units and must
+not be treated as equivalent queue rankings.
+
+The maintained harness labels delivery units, uses one validated payload
+format, emits raw JSON trials, and fails when delivery
+accounting or payload validation is inconsistent.
+
 ## Optional external baselines
 
 All external baselines are benchmark-only and default OFF. The default build
-does not fetch or require third-party queue libraries.
+does not fetch or require third-party queue libraries. Enable optional baseline
+scenarios with:
 
 ```sh
 cmake -S . -B build-baselines -DCMAKE_BUILD_TYPE=Release \

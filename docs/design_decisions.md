@@ -61,10 +61,10 @@ starting during that copy. The current implementation therefore holds a mutex
 across publication and copy, tracks each consumer with an owned cursor, and
 reports lag when retained history has been overwritten.
 
-The global-index illustration below is useful for understanding the contention
-question, but it is not the current synchronization protocol.
+The retained-history diagram below shows the current delivery contract rather
+than a rejected per-slot synchronization protocol.
 
-![Global-index multicast design exploration](../assets/line64_global_index_spmc.svg)
+![SPMC multicast retained-history flow](assets/spmc_multicast_retention.svg)
 
 ## Benchmark Decisions
 
@@ -73,6 +73,13 @@ one valid pop per publication after drain. Multicast trials report aggregate
 consumer observations separately from unique publication IDs. Every measured
 payload carries an ID and checksum so loss, duplication, and corruption can be
 reported instead of hidden by a throughput total.
+
+The diagram below shows why semantic labels matter. Work-sharing queues count
+exclusive pops, while multicast SPMC counts consumer observations of retained
+messages. Those units must be reported separately and must not be collapsed into
+a single queue ranking.
+
+![Benchmark delivery semantics comparison](assets/delivery_semantics_comparison.svg)
 
 The benchmark harness groups scenarios by delivery semantics before throughput
 is compared. SPSC exclusive handoff, MPMC exclusive-pop work sharing, and SPMC

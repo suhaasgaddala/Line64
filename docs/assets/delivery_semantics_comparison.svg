@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-labelledby="title desc">
+  <title id="title">Queue delivery accounting</title>
+  <desc id="desc">A clean scientific bar chart showing that work-sharing queues count exclusive pops while multicast SPMC counts aggregate consumer observations.</desc>
+  <style>
+    text { font-family: Arial, Helvetica, sans-serif; fill: #111; }
+    .title { font-size: 24px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #444; }
+    .axis { stroke: #222; stroke-width: 1.4; }
+    .grid { stroke: #e1e1e1; stroke-width: 1; }
+    .tick { font-size: 12px; fill: #333; }
+    .label { font-size: 13px; }
+    .label-bold { font-size: 13px; font-weight: 700; }
+    .caption { font-size: 12px; fill: #444; }
+    .bar-work { fill: #4e79a7; }
+    .bar-spmc { fill: #f28e2b; }
+    .bar-unique { fill: #59a14f; }
+    .note { fill: #fff; stroke: #bbb; stroke-width: 1; }
+  </style>
+
+  <rect width="1000" height="520" fill="#fff"/>
+  <text class="title" x="48" y="42">Queue delivery accounting</text>
+  <text class="subtitle" x="48" y="66">Illustrative units for one publication with three registered consumers; not a throughput result.</text>
+
+  <line class="grid" x1="120" y1="335" x2="780" y2="335"/>
+  <line class="grid" x1="120" y1="260" x2="780" y2="260"/>
+  <line class="grid" x1="120" y1="185" x2="780" y2="185"/>
+  <line class="grid" x1="120" y1="110" x2="780" y2="110"/>
+
+  <line class="axis" x1="120" y1="410" x2="780" y2="410"/>
+  <line class="axis" x1="120" y1="110" x2="120" y2="410"/>
+
+  <text class="tick" x="92" y="414">0</text>
+  <text class="tick" x="88" y="339">1x</text>
+  <text class="tick" x="88" y="264">2x</text>
+  <text class="tick" x="88" y="189">3x</text>
+  <text class="tick" x="88" y="114">4x</text>
+
+  <rect class="bar-work" x="190" y="335" width="110" height="75"/>
+  <rect class="bar-spmc" x="410" y="185" width="110" height="225"/>
+  <rect class="bar-unique" x="630" y="335" width="110" height="75"/>
+
+  <text class="label-bold" x="231" y="378" fill="#fff">1x</text>
+  <text class="label-bold" x="451" y="306" fill="#fff">3x</text>
+  <text class="label-bold" x="671" y="378" fill="#fff">1x</text>
+
+  <text class="label-bold" x="178" y="440">work-sharing pop</text>
+  <text class="caption" x="182" y="461">one consumer removes item</text>
+
+  <text class="label-bold" x="386" y="440">SPMC observations</text>
+  <text class="caption" x="388" y="461">three consumers observe it</text>
+
+  <text class="label-bold" x="618" y="440">unique publication IDs</text>
+  <text class="caption" x="631" y="461">same original message</text>
+
+  <text class="label" transform="translate(48 322) rotate(-90)">observations per publication</text>
+
+  <rect class="note" x="808" y="160" width="150" height="146" rx="4"/>
+  <text class="label-bold" x="828" y="190">Interpretation</text>
+  <text class="caption" x="828" y="218">Work-sharing and</text>
+  <text class="caption" x="828" y="236">multicast measure</text>
+  <text class="caption" x="828" y="254">different units.</text>
+  <text class="caption" x="828" y="282">The benchmark keeps</text>
+  <text class="caption" x="828" y="300">those fields separate.</text>
+
+  <text class="caption" x="120" y="500">Bars show delivery accounting only. They are not measured throughput and are not a queue ranking.</text>
+</svg>

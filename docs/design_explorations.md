@@ -63,9 +63,7 @@ the CMake target but is neither included nor exercised by the executable.
 queue_experiment/
 |-- CMakeLists.txt             CMake project and experiment executable
 |-- README.md                  Conceptual overview and benchmark narrative
-|-- assets/
-|   |-- benchmark.png          Illustrative benchmark bar chart
-|   `-- line64_global_index_spmc.svg Diagram of a global-index SPMC design
+|-- assets/                     Optional design and benchmark illustrations
 `-- src/
     |-- main.cpp               Producers, consumers, benchmark scenarios, entry point
     |-- benchmark.h            Benchmark callable type and declaration
@@ -320,16 +318,13 @@ high-throughput run. No warm-up, repetitions, confidence intervals, CPU
 affinity, compiler mode report, latency measurement, fairness measure, or
 correctness checksum is present.
 
-### 9.4 Illustrative chart
+### 9.4 Delivery semantics diagram
 
-[`assets/benchmark_semantics_example.png`](assets/benchmark_semantics_example.png)
-reports approximate five-second totals for 1, 3, and 10
-consumers. It shows SPMC far above the other queues and decreasing as consumer
-count rises. The exact raw observations, machine specifications, compiler
-flags, generation script, and date are not tracked. The comparison is not fair
-because the baseline queues are not multicast. The image is an example of
-insufficient benchmark semantics and provenance, not a reproducible performance
-claim.
+[`assets/delivery_semantics_comparison.svg`](assets/delivery_semantics_comparison.svg)
+documents the accounting distinction that the maintained benchmark enforces:
+work-sharing queues count exclusive pops, while multicast SPMC counts aggregate
+consumer observations of retained messages. The diagram is explanatory contract
+documentation, not a reproducible performance result or ranking.
 
 ## 10. Build and Toolchain
 
@@ -440,7 +435,7 @@ Until those exist, benchmark completion is not evidence of queue correctness.
 
 - Compared queues have different semantics and payloads.
 - Counts are aggregate operations rather than comparable unique deliveries.
-- Illustrative chart inputs and environment are unavailable.
+- Benchmark-unit diagrams are explanatory and are not performance evidence.
 - Blocking tests can hang and are currently disabled.
 - Correctness is not checked during measurement.
 

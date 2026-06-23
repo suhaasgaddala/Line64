@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-labelledby="title desc">
+  <title id="title">SPMC retained-history ring semantics</title>
+  <desc id="desc">Two classic ring diagrams showing producer publication into retained storage and independent consumer cursors over the same retained history.</desc>
+  <defs>
+    <marker id="arrow-black" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#222"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#1f77b4"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#b22222"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #111; }
+      .title { font-size: 24px; font-weight: 700; }
+      .subtitle { font-size: 14px; fill: #444; }
+      .panel-title { font-size: 16px; font-weight: 700; }
+      .label { font-size: 13px; }
+      .small { font-size: 12px; fill: #444; }
+      .ring-empty { fill: none; stroke: #d7d7d7; stroke-width: 28; stroke-dasharray: 13 8; }
+      .ring-retained { fill: none; stroke: #4aa3df; stroke-width: 28; stroke-dasharray: 13 8; stroke-linecap: butt; }
+      .ring-write { fill: none; stroke: #f28e2b; stroke-width: 28; stroke-dasharray: 13 8; stroke-linecap: butt; }
+      .ring-lag { fill: none; stroke: #e15759; stroke-width: 28; stroke-dasharray: 13 8; stroke-linecap: butt; }
+      .inner { fill: #fff; stroke: #777; stroke-width: 1.4; }
+      .panel { fill: #fff; stroke: #d0d0d0; stroke-width: 1.2; }
+      .box { fill: #f7f7f7; stroke: #555; stroke-width: 1.1; }
+      .legend-box { fill: #fff; stroke: #ccc; stroke-width: 1; }
+      .arrow { stroke: #222; stroke-width: 1.7; fill: none; marker-end: url(#arrow-black); }
+      .arrow-blue { stroke: #1f77b4; stroke-width: 1.8; fill: none; marker-end: url(#arrow-blue); }
+      .arrow-red { stroke: #b22222; stroke-width: 1.8; fill: none; marker-end: url(#arrow-red); }
+    </style>
+  </defs>
+
+  <rect width="1000" height="520" fill="#fff"/>
+  <text class="title" x="40" y="42">SPMC retained-history ring semantics</text>
+  <text class="subtitle" x="40" y="66">A single producer publishes into bounded storage; registered consumers keep independent cursors.</text>
+
+  <rect class="panel" x="48" y="96" width="420" height="310" rx="6"/>
+  <rect class="panel" x="532" y="96" width="420" height="310" rx="6"/>
+
+  <text class="panel-title" x="72" y="130">Publication state</text>
+  <text class="small" x="72" y="150">The producer advances the newest retained sequence.</text>
+
+  <circle class="ring-empty" cx="258" cy="254" r="94"/>
+  <path class="ring-retained" d="M258 160 A94 94 0 1 1 177 302"/>
+  <path class="ring-write" d="M352 254 A94 94 0 0 1 326 321"/>
+  <circle class="inner" cx="258" cy="254" r="58"/>
+  <text class="label" x="229" y="247">retained</text>
+  <text class="label" x="232" y="266">window</text>
+
+  <rect class="box" x="78" y="226" width="112" height="44" rx="5"/>
+  <text class="label" x="104" y="253">producer</text>
+  <path class="arrow" d="M190 240 C238 202 304 198 342 244"/>
+
+  <text class="label" x="92" y="178">oldest retained</text>
+  <path class="arrow-blue" d="M170 180 C186 178 202 176 218 176"/>
+
+  <text class="label" x="330" y="178">newest</text>
+  <text class="label" x="330" y="194">published</text>
+  <path class="arrow" d="M350 200 C356 216 358 230 352 242"/>
+
+  <text class="label" x="340" y="346">write slot</text>
+  <path class="arrow" d="M338 336 C335 324 331 318 326 312"/>
+
+  <text class="panel-title" x="556" y="130">Independent consumer cursors</text>
+  <text class="small" x="556" y="150">A read does not remove the message for other consumers.</text>
+
+  <circle class="ring-empty" cx="742" cy="254" r="94"/>
+  <path class="ring-lag" d="M648 254 A94 94 0 0 1 675 187"/>
+  <path class="ring-retained" d="M675 187 A94 94 0 1 1 822 304"/>
+  <path class="ring-write" d="M836 254 A94 94 0 0 1 810 321"/>
+  <circle class="inner" cx="742" cy="254" r="58"/>
+  <text class="label" x="717" y="247">same</text>
+  <text class="label" x="700" y="266">history</text>
+
+  <text class="label" x="870" y="180">C0 latest</text>
+  <path class="arrow-blue" d="M864 182 C825 191 807 206 791 225"/>
+
+  <text class="label" x="872" y="322">C1 behind</text>
+  <path class="arrow-blue" d="M864 318 C827 312 807 306 789 297"/>
+
+  <text class="label" x="566" y="335">C2 lagged</text>
+  <path class="arrow-red" d="M637 328 C652 304 655 282 649 259"/>
+
+  <rect class="legend-box" x="216" y="430" width="568" height="46" rx="5"/>
+  <rect x="244" y="446" width="26" height="12" fill="#4aa3df"/>
+  <text class="small" x="278" y="457">retained history</text>
+  <rect x="408" y="446" width="26" height="12" fill="#f28e2b"/>
+  <text class="small" x="442" y="457">write in progress</text>
+  <rect x="604" y="446" width="26" height="12" fill="#e15759"/>
+  <text class="small" x="638" y="457">lagged cursor</text>
+
+  <text class="small" x="218" y="500">Contract: multicast reads observe retained messages; each consumer advances its own cursor.</text>
+</svg>
