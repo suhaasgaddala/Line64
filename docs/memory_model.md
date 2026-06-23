@@ -116,6 +116,13 @@ also has no close operation. An undersized destination consumes the claimed
 message and releases the cell because the dequeue position cannot safely be
 rolled back. Full details are in [mpmc_queue.md](mpmc_queue.md).
 
+The MPMC storage layout uses `std::hardware_destructive_interference_size`
+when available, with a 64-byte fallback otherwise. Ring cells and the hot
+enqueue/dequeue position counters are aligned and padded, with static
+assertions checking that the selected layout is honored. This is a false-sharing
+risk reduction for cache locality, not a correctness requirement or formal
+performance guarantee.
+
 ## Why no mutex is not the same as lock-free
 
 "Contains no mutex" describes an implementation detail. Lock-free is a

@@ -51,8 +51,14 @@ generation by storing `position + capacity` with release ordering.
 The acquire/release cell sequence is the ownership handoff for ordinary,
 non-atomic payload bytes. Position atomics allocate claims; they do not publish
 payload contents. There is no dynamic allocation in `try_push` or `try_pop`.
-The enqueue and dequeue positions and each cell are 64-byte aligned as a
-best-effort false-sharing reduction, not as a portable cache-line guarantee.
+For cache locality, `MPMCQueue` uses
+`std::hardware_destructive_interference_size` when the standard library exposes
+it and falls back to 64 bytes otherwise. Cells and the hot enqueue/dequeue
+position counters are aligned and padded to that size. Compile-time layout
+assertions verify the resulting cell and counter sizes are multiples of the
+selected alignment. This reduces false-sharing risk, but it is not a formal
+performance guarantee because actual cache-line behavior remains
+platform-dependent.
 
 ## Short destinations
 

@@ -208,8 +208,11 @@ adapted from Dmitry Vyukov's array-based sequence-cell algorithm.
 - Construction allocates one `Cell[]`; try operations allocate nothing.
 - Every cell holds an atomic `std::size_t` generation and one `FixedMessage<N>`.
 - `mask = capacity - 1` maps positions to cells.
-- Enqueue position, dequeue position, and cells are 64-byte aligned as a
-  best-effort false-sharing reduction.
+- Cells and hot enqueue/dequeue position counters are aligned and padded using
+  `std::hardware_destructive_interference_size` when available, with a 64-byte
+  fallback otherwise.
+- Static assertions verify the cell and padded-counter layout assumptions.
+  This reduces false-sharing risk but is not a formal performance guarantee.
 
 ### 10.2 Enqueue
 
